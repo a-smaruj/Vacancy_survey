@@ -1,0 +1,97 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+# Installing packages
+library(tidyverse)
+library("lubridate")
+library(readxl)
+```
+
+```{r}
+# Read data
+Pracuj_phones <- read_xlsx('pracuj-proba-ang.xlsx', sheet=1)
+```
+
+```{r}
+# Changing for date
+Pracuj_phones$invaildFrom <- ymd(Pracuj_phones$invaildFrom)
+Pracuj_phones$expirationDate <- ymd(Pracuj_phones$expirationDate)
+Pracuj_phones$conversationDate <- ymd(Pracuj_phones$conversationDate)
+
+# Changing for numeric
+Pracuj_phones$positions <- as.numeric(as.character(Pracuj_phones$positions))
+
+# Changing to lower for consistency
+Pracuj_phones$valid <- tolower(Pracuj_phones$valid)
+
+```
+
+```{r}
+# The size of sample, answered calls, not anwered calls
+nrows <- nrow(Pracuj_phones)
+
+answered <- Pracuj_phones %>% filter(!is.na(conversationDate)) %>% count()
+not_answered <- Pracuj_phones %>% filter(is.na(conversationDate)) %>% count()
+
+# Number of answered call where people cooperated, partly cooperated, didn't cooperated and had no information
+
+answered_cooperation <- Pracuj_phones %>% 
+  filter(!is.na(conversationDate), !is.na(valid),                                             grepl('brak współpracy', notes) == FALSE) %>% count()
+
+no_cooperation <- Pracuj_phones %>% filter(grepl('brak współpracy', notes) == TRUE, is.na(valid)) %>% count()
+
+partly_cooperation <- Pracuj_phones %>% filter(grepl('brak współpracy', notes) == TRUE, !is.na(valid)) %>% count()
+
+no_information <- Pracuj_phones %>% filter(!is.na(conversationDate), grepl('brak współpracy', notes) == FALSE, is.na(valid)) %>% count()
+
+```
+
+```{r}
+#call date
+min_call_date <- min(Pracuj_phones$conversationDate, na.rm = TRUE)
+max_call_date <- max(Pracuj_phones$conversationDate, na.rm = TRUE)
+amount_days <- length(unique(na.omit(Pracuj_phones$conversationDate)))
+```
+
+```{r}
+# Quantity of valid and invalid jobs offer
+
+valid_job_offer <- Pracuj_phones %>% filter(valid == 'true') %>% count()
+
+invalid_job_offer <- Pracuj_phones %>% filter(valid == 'false') %>% count()
+
+```
+
+```{r}
+# Median of call date - false_offer date
+median_time_invalid <- median(as.Date("2021-09-30") - Pracuj_phones$invaildFrom, 
+                        na.rm = TRUE)
+```
+
+```{r}
+# Real vacancy 
+estimated_n <- Pracuj_phones %>% filter(grepl('większe zapotrzebowanie', notes) == TRUE, is.na(positions)) %>% count()
+n_phone_vacancy <- sum(Pracuj_phones$positions, na.rm = TRUE) + estimated_n * 2
+
+```
+
+```{r}
+#'Number of offers depending on report of demand for vacancy' - table
+Pracuj_demand_vacancy <- Pracuj_phones %>% filter(valid == 'true' 
+                                              & !is.na(positions)) %>%
+  group_by(positions) %>% count()
+
+Pracuj_demand_vacancy$positions <- as.character(Pracuj_demand_vacancy$positions)
+Pracuj_demand_vacancy <- Pracuj_demand_vacancy %>% rename('number_of_offers' = n)
+
+Pracuj_demand_vacancy <- ungroup(Pracuj_demand_vacancy)
+Pracuj_demand_vacancy <- add_row(Pracuj_demand_vacancy, positions = '> 1', 
+        number_of_offers = estimated_n[[1]])
+
+ggplot(data = Pracuj_demand_vacancy, aes(x = positions, y = number_of_offers)) +
+  geom_bar(stat = 'identity', fill = 'darksalmon', col = 'black') +
+  theme_bw()
+```
