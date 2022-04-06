@@ -58,154 +58,147 @@ read_cbop <- function(file) {
                             !prac_nip %in% c("0000000000", "1111111111")]
 
   final_df[, ":="(war_gmina = tolower(war_gmina), 
-                  war_miejscowosc=tolower(war_miejscowosc))]
+                  war_ulica=tolower(war_ulica),
+                  war_miejscowosc=tolower(war_miejscowosc),
+                  war_stanowisko=tolower(war_stanowisko))]
+  final_df[, war_ulica:=str_replace(war_ulica,  "pl\\.", "plac ")]	
+  final_df[, war_ulica:=str_replace(war_ulica,  "al\\.", "aleja ")]	
+  final_df[, war_ulica:=str_replace(war_ulica,  "  ", " ")]	
+  final_df[, war_ulica:=str_remove(war_ulica,  "^\\.|-$")]
   final_df[, ":="(war_gmina = str_remove(war_gmina, "m.st. "))]
   final_df[, kod_pocztowy:=str_remove(kod_pocztowy, "00-000")]
   final_df[kod_pocztowy == "", kod_pocztowy := NA]
   final_df[, poz_kodZawodu := str_remove(poz_kodZawodu, "RPd057\\|")]
+  final_df[, poz_grupaZawodu := substr(poz_kodZawodu, 1, 1)]
+  final_df[, prac_regon := substr(prac_regon, 1, 9)]
+  final_df[, poz_dataUdostepnieniaOferty := ymd(poz_dataUdostepnieniaOferty)]
 
   return(final_df)
 }
 ```
 
 ```{r}
+create_table <- function(cbop_year, files) {
+
+  for (file in files) {
+    cbop_year[[length(cbop_year)+1]] <- read_cbop(file)
+  }
+  
+  files <- str_remove(files, 'data\\\\\\d+\\\\')
+  files <- str_remove(files, '_full.json')
+  
+  names(cbop_year) <- basename(files)
+  
+  cbop_year <- rbindlist(cbop_year, idcol = "file")
+  cbop_year$file <- ymd(cbop_year$file)
+  
+  return(cbop_year)
+}
+```
+
+```{r}
+remove_duplicates <- function(cbop_year) {
+  
+  #Identical job offers
+  cbop_year <- cbop_year %>% filter(duplicated(cbop_year,
+                                               by=names(cbop_year)[names(cbop_year)
+                                                                   !='file'], 
+                                       fromLast = TRUE) == FALSE)
+  
+  #Prolonged job offers
+  cbop_year <- cbop_year %>% filter(duplicated(cbop_year, 
+                                       by=names(cbop_year)[!names(cbop_year) %in% 
+                                                    c('file','poz_ofertaWaznaDo')], 
+                                       fromLast = TRUE) == FALSE)
+  
+  #TODO
+  
+  return(cbop_year)
+}
+```
+
+```{r}
+#Analysis - duplicates
+
+n <- length(unique(cbop_2020$hash))
+
+d_unique <- cbop_2020 %>% filter(duplicated(cbop_2020, by='hash', 
+                                     fromLast = F) == FALSE)
+
+d_duplicate <- cbop_2020 %>% filter(duplicated(cbop_2020, by='hash', 
+                                     fromLast = F) == TRUE)
+
+d_duplicate <- d_duplicate %>% arrange(desc(hash))
+d_duplicate %>% filter(hash == 'fcdb1d45049fbe8bdff2fb6b397fba5c')
+```
+
+```{r}
+#Notatki
+#Różnice w prac_pracodawca (Sp ZOO, Sk....)
+#Różnice w war_wynagrodzenieBrutto
+#Osoba do kontatku + numer kontaktowy
+#war_dataRozpoczęciaPracy np. (file 08.11.2020) 09.11.2020, (26.11.2020) 16.11.2020, (29.11.2020) 01.12.2020 lub (file 07.12.2020) 04.12.2020, (08.12.2020) 12.12.2020
+#polskie litery - war_stanowisko zakłądu
+#war_stanowisko: "specjalista ds. handlowych-133"	i "133-specjalista ds. handlowych"
+
+```
+
+```{r}
 #2020
 cbop_2020 <- list()
 files <- Sys.glob('data\\2020\\*.json')
-
-for (file in files) {
-    cbop_2020[[length(cbop_2020)+1]] <- read_cbop(file)
-}
-
-names(cbop_2020) <- basename(files)
-
-cbop_2020 <- rbindlist(cbop_2020, idcol = "files")
-
-#TODO - duplicates
-cbop_2020 <- unique(cbop_2020)
-
-#Useful columns
-cbop_2020 <- cbop_2020 %>% select(hash, poz_identyfikatorOferty, poz_kodZawodu,
-                                  poz_lWolnychMiejsc, poz_dataUdostepnieniaOferty,
-                                  poz_dataPrzyjZglosz, poz_ofertaWaznaDo,
-                                  poz_ofertaZgloszonaPrzez, 
-                                  poz_ofertaZgloszonaPrzezKodJednostki, war_kraj,
-                                  war_wojewodztwo, war_kodWojewodztwa, war_powiat,
-                                  war_kodPowiatu, war_gmina, war_miejscowosc,
-                                  war_kodMiejscowosci, war_miejscePracy, war_zawod,
-                                  war_wymiarEtatu, war_rodzajZatrudnienia,
-                                  war_kodRodzajuZatrudnienia, war_pensjaNetto, 
-                                  prac_nazwaUrzeduPracy, statusOferty, kod_pocztowy)
+cbop_2020<- create_table(cbop_2020, files)
+cbop_2020 <- remove_duplicates(cbop_2020)
 ```
 
 ```{r}
 #2022
 cbop_2022 <- list()
 files <- Sys.glob('data\\2022\\*.json')
-
-for (file in files) {
-    cbop_2022[[length(cbop_2022)+1]] <- read_cbop(file)
-}
-
-names(cbop_2022) <- basename(files)
-
-cbop_2022 <- rbindlist(cbop_2022, idcol = "files")
-
-#TODO - duplicates
-cbop_2022 <- unique(cbop_2022)
-
-#Useful columns
-cbop_2022 <- cbop_2022 %>% select(hash, poz_identyfikatorOferty, poz_kodZawodu,
-                                  poz_lWolnychMiejsc, poz_dataUdostepnieniaOferty,
-                                  poz_dataPrzyjZglosz, poz_ofertaWaznaDo,
-                                  poz_ofertaZgloszonaPrzez, 
-                                  poz_ofertaZgloszonaPrzezKodJednostki, war_kraj,
-                                  war_wojewodztwo, war_kodWojewodztwa, war_powiat,
-                                  war_kodPowiatu, war_gmina, war_miejscowosc,
-                                  war_kodMiejscowosci, war_miejscePracy, war_zawod,
-                                  war_wymiarEtatu, war_rodzajZatrudnienia,
-                                  war_kodRodzajuZatrudnienia, war_pensjaNetto, 
-                                  prac_nazwaUrzeduPracy, statusOferty, kod_pocztowy)
+cbop_2022 <- create_table(cbop_2022, files)
+cbop_2022 <- remove_duplicates(cbop_2022)
 ```
 
 ```{r}
-#1 Part 2021
-cbop_2021_1 <- list()
-
+#2021
 files <- Sys.glob('data\\2021\\*.json') 
 
+cbop_2021_1 <- list()
 files_1 <- files[1:floor(length(files)/2)]
+cbop_2021_1 <- create_table(cbop_2021_1, files_1)
+cbop_2021_1 <- remove_duplicates(cbop_2021_1)
 
-for (file in files_1) {
-    cbop_2021_1[[length(cbop_2021_1)+1]] <- read_cbop(file)
-}
-
-names(cbop_2021_1) <- basename(files_1)
-
-cbop_2021_1 <- rbindlist(cbop_2021_1, idcol = "files_1")
-
-#TODO - duplicates
-cbop_2021_1 <- unique(cbop_2021_1)
-
-#Useful columns
-cbop_2021_1 <- cbop_2021_1 %>% select(hash, poz_identyfikatorOferty, poz_kodZawodu,
-                                  poz_lWolnychMiejsc, poz_dataUdostepnieniaOferty,
-                                  poz_dataPrzyjZglosz, poz_ofertaWaznaDo,
-                                  poz_ofertaZgloszonaPrzez, 
-                                  poz_ofertaZgloszonaPrzezKodJednostki, war_kraj,
-                                  war_wojewodztwo, war_kodWojewodztwa, war_powiat,
-                                  war_kodPowiatu, war_gmina, war_miejscowosc,
-                                  war_kodMiejscowosci, war_miejscePracy, war_zawod,
-                                  war_wymiarEtatu, war_rodzajZatrudnienia,
-                                  war_kodRodzajuZatrudnienia, war_pensjaNetto, 
-                                  prac_nazwaUrzeduPracy, statusOferty, kod_pocztowy)
-```
-
-```{r}
-#2 Part 2021
 cbop_2021_2 <- list()
 files_2 <- files[(1+floor(length(files)/2)):length(files)]
+cbop_2021_2 <- create_table(cbop_2021_2, files_2)
+cbop_2021_2 <- remove_duplicates(cbop_2021_2)
 
-for (file in files_2) {
-    cbop_2021_2[[length(cbop_2021_2)+1]] <- read_cbop(file)
-}
-
-names(cbop_2021_2) <- basename(files_2)
-
-cbop_2021_2 <- rbindlist(cbop_2021_2, idcol = "files_2")
-
-#TODO - duplicates
-cbop_2021_2 <- unique(cbop_2021_2)
-
-#Useful columns
-cbop_2021_2 <- cbop_2021_2 %>% select(hash, poz_identyfikatorOferty, poz_kodZawodu,
-                                  poz_lWolnychMiejsc, poz_dataUdostepnieniaOferty,
-                                  poz_dataPrzyjZglosz, poz_ofertaWaznaDo,
-                                  poz_ofertaZgloszonaPrzez, 
-                                  poz_ofertaZgloszonaPrzezKodJednostki, war_kraj,
-                                  war_wojewodztwo, war_kodWojewodztwa, war_powiat,
-                                  war_kodPowiatu, war_gmina, war_miejscowosc,
-                                  war_kodMiejscowosci, war_miejscePracy, war_zawod,
-                                  war_wymiarEtatu, war_rodzajZatrudnienia,
-                                  war_kodRodzajuZatrudnienia, war_pensjaNetto, 
-                                  prac_nazwaUrzeduPracy, statusOferty, kod_pocztowy)
-```
-
-```{r}
-#2021 together
 cbop_2021 <- rbindlist(list(cbop_2021_1, cbop_2021_2))
 rm(cbop_2021_1)
 rm(cbop_2021_2)
 
-#TODO - duplicates
-cbop_2021 <- unique(cbop_2021)
+cbop_2021 <- remove_duplicates(cbop_2021)
+```
+
+```{r}
+#Useful columns
+columns <- c('file', 'hash', 'poz_identyfikatorOferty', 'poz_kodZawodu', 
+             'poz_grupaZawodu', 'poz_lWolnychMiejsc', 'poz_dataUdostepnieniaOferty',
+             'poz_dataPrzyjZglosz', 'poz_ofertaWaznaDo', 'poz_ofertaZgloszonaPrzez', 
+             'poz_ofertaZgloszonaPrzezKodJednostki', 'war_kraj', 'war_wojewodztwo',
+             'war_kodWojewodztwa', 'war_powiat', 'war_kodPowiatu', 'war_gmina',
+             'war_miejscowosc', 'war_kodMiejscowosci', 'war_ulica', 'war_miejscePracy',
+             'war_zawod', 'war_stanowisko', 'war_wymiarEtatu', 'war_rodzajZatrudnienia',
+             'war_kodRodzajuZatrudnienia', 'war_pensjaNetto', 'prac_nazwaUrzeduPracy',
+             'statusOferty', 'kod_pocztowy')
+
+cbop_2020 <- cbop_2020[, ..columns]
 ```
 
 ```{r}
 #2020-2022 All
 cbop_all <- rbindlist(list(cbop_2020, cbop_2021, cbop_2022))
-#TODO - duplicates
-cbop_all <- unique(cbop_all)
+cbop_all <- remove_duplicates(cbop_all)
 ```
 
 ```{r}
