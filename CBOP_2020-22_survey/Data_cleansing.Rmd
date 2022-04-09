@@ -8,6 +8,7 @@ library(RcppSimdJson)
 library(data.table)
 library("lubridate")
 library(tidyverse)
+library(janitor)
 ```
 
 ```{r}
@@ -84,12 +85,12 @@ create_table <- function(cbop_year, files) {
     cbop_year[[length(cbop_year)+1]] <- read_cbop(file)
   }
   
-  files <- str_remove(files, 'data\\\\\\d+\\\\')
-  files <- str_remove(files, '_full.json')
+  files <- str_remove_all(files, '(data\\\\\\d+\\\\|_full.json)')
   
   names(cbop_year) <- basename(files)
-  
   cbop_year <- rbindlist(cbop_year, idcol = "file")
+  
+  cbop_year <- cbop_year %>% remove_constant()
   cbop_year$file <- ymd(cbop_year$file)
   
   return(cbop_year)
@@ -118,18 +119,36 @@ remove_duplicates <- function(cbop_year) {
 ```
 
 ```{r}
-#Analysis - duplicates
-
+#Number of unique hash/job offers
 n <- length(unique(cbop_2020$hash))
 
-d_unique <- cbop_2020 %>% filter(duplicated(cbop_2020, by='hash', 
-                                     fromLast = F) == FALSE)
+#remove polish letters - takes a lot of time
+cbop_2020$war_stanowisko %>% make_clean_names()
+cbop_2020$war_stanowisko
 
-d_duplicate <- cbop_2020 %>% filter(duplicated(cbop_2020, by='hash', 
-                                     fromLast = F) == TRUE)
+#Table with duplicates and with unique value
+e_duplicate <- cbop_2020 %>% get_dupes(hash)
 
-d_duplicate <- d_duplicate %>% arrange(desc(hash))
-d_duplicate %>% filter(hash == 'fcdb1d45049fbe8bdff2fb6b397fba5c')
+e_unique <- setdiff(cbop_2020, e_duplicate[,-2,with=FALSE])
+
+#Remove duplicates cd.
+
+#not working, problem with name "column"
+for (column in columns_to_clean) {
+  e_duplicate$column <- str_remove(e_duplicate$column %>% make_clean_names(), '\\_\\d$')
+}
+
+e_duplicate <- e_duplicate[,-2,with=FALSE] %>% filter(duplicated(e_duplicate, 
+                                       by=names(e_duplicate)[!names(e_duplicate) %in% 
+                                                    c('file','poz_ofertaWaznaDo')], 
+                                       fromLast = TRUE) == FALSE)
+
+e_duplicate_2 <- e_duplicate %>% get_dupes(hash)
+e_unique <- rbind(setdiff(e_duplicate, e_duplicate_2[,-2,with=FALSE]), e_unique)
+
+#Analysis - duplicates
+e_duplicate <- e_duplicate %>% arrange(desc(hash))
+e_duplicate %>% filter(hash == 'fcdb1d45049fbe8bdff2fb6b397fba5c')
 ```
 
 ```{r}
@@ -192,6 +211,31 @@ columns <- c('file', 'hash', 'poz_identyfikatorOferty', 'poz_kodZawodu',
              'war_kodRodzajuZatrudnienia', 'war_pensjaNetto', 'prac_nazwaUrzeduPracy',
              'statusOferty', 'kod_pocztowy')
 
+columns_to_clean <- c("prac_pracodawca", "prac_adres", "prac_emailOsobyZglPracodawca", 
+                       "prac_profilDzialanosci", "prac_miejscowoscPracodawca", 
+                       "prac_powiatPracodawca", "prac_wojewodztwoPracodawca", 
+                       "prac_wymaganeDokumenty", "prac_email", 
+                       "prac_imieNazwiskoOsobyZglPracodawca", "prac_jezykAplikacji",
+                       "prac_branza", "prac_nazwaUrzeduPracy", "prac_ulica", 
+                       "prac_typPodmiotu", "poz_potwierdzenieWiedzy", "poz_celeEdukacyjne",
+                       "poz_nazwaLiczMiejsc", "war_miejscePracyCzlonDrugi",
+                       "war_powodOddelegowania", "war_rodzajZatrudnienia", "war_wojewodztwo",
+                       "war_ulica", "war_zawod", "war_opisWynagrodzenia",
+                       "war_systemWynagradzania", "war_stanowisko", "war_miejscowosc",
+                       "typOfertyNaglowek", "kodJezyka", "prac_osobaDoKontaktu",
+                       "prac_publikowacDanePracodawcy", "prac_kraj", "prac_sposobAplShort",
+                       "prac_sposobAplikowania", "prac_wojewodztwo", "prac_adresWww",
+                       "prac_ulicaPracodawca", "prac_powiat", "prac_gmina", 
+                       "prac_krajPracodawca", "prac_adresAplPracodawca", "prac_miejscowosc",
+                       "prac_sposobPrzekazaniaDok", "prac_gminaPracodawca", "poz_zawod",
+                       "poz_wykorzystanieOferty", "poz_ofertaZgloszonaPrzez",
+                       "war_rodzajWynagrodzenia", "war_lokalizacja", "war_zakresObowiazkow",
+                       "war_rodzajObowiazkow", "war_opisOferty", 
+                       "war_miejscePracyCzlonPierwszy", "war_powiat", 
+                       "war_informacjeOLokalizacji", "war_gmina", "war_miejscePracy",
+                       "war_dodSwiadczenia", "war_wymiarEtatu",  
+                       "war_skroconyRodzajZatrudnienia", "war_zmianowosc", "nazwa")
+
 cbop_2020 <- cbop_2020[, ..columns]
 ```
 
@@ -202,7 +246,7 @@ cbop_all <- remove_duplicates(cbop_all)
 ```
 
 ```{r}
-#Create RDS file
+#Create RDS files
 saveRDS(cbop_2020, file = "cbop_2020.rds")
 saveRDS(cbop_2021, file = "cbop_2021.rds")
 saveRDS(cbop_2022, file = "cbop_2022.rds")
