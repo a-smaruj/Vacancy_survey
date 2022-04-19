@@ -85,7 +85,7 @@ columns_to_keep <- c('file', 'hash', 'prac_osobaDoKontaktu', 'prac_nrTelefonu', 
 ```
 
 ```{r}
-create_table <- function(cbop_year, files, columns_to_keep) {
+create_table <- function(cbop_year, files) {
 
   for (file in files) {
     cbop_year[[length(cbop_year)+1]] <- read_cbop(file)
@@ -97,7 +97,6 @@ create_table <- function(cbop_year, files, columns_to_keep) {
   cbop_year <- rbindlist(cbop_year, idcol = "file")
   cbop_year$file <- ymd(cbop_year$file)
   
-  cbop_year <- cbop_year %>% remove_constant()
   cbop_year <- cbop_year[, ..columns_to_keep]
   
   for (i in columns_to_keep) {
@@ -130,11 +129,30 @@ remove_duplicates <- function(cbop_year) {
                                                     c('file','war_dataRozpoczeciaPracy')], 
                                        fromLast = TRUE) == FALSE)
   
+  #Actualised job offers - different end date
+  cbop_year <- cbop_year %>% filter(duplicated(cbop_year, 
+                                       by=names(cbop_year)[!names(cbop_year) %in% 
+                                                    c('file','war_dataZakonczeniaPracy')], 
+                                       fromLast = TRUE) == FALSE)
+
   #Prolonged job offers and actualised job offers
   cbop_year <- cbop_year %>% filter(duplicated(cbop_year, 
                                        by=names(cbop_year)[!names(cbop_year) %in% 
                                                     c('file','poz_ofertaWaznaDo',
                                                       'war_dataRozpoczeciaPracy')], 
+                                       fromLast = TRUE) == FALSE)
+  
+  cbop_year <- cbop_year %>% filter(duplicated(cbop_year, 
+                                       by=names(cbop_year)[!names(cbop_year) %in% 
+                                                    c('file','poz_ofertaWaznaDo',
+                                                      'war_dataZakonczeniaPracy')], 
+                                       fromLast = TRUE) == FALSE)
+  
+  cbop_year <- cbop_year %>% filter(duplicated(cbop_year, 
+                                       by=names(cbop_year)[!names(cbop_year) %in% 
+                                                    c('file','poz_ofertaWaznaDo',
+                                                      'war_dataRozpoczeciaPracy',
+                                                      'war_dataZakonczeniaPracy')], 
                                        fromLast = TRUE) == FALSE)
   
   #Job offers with different phone no.
@@ -166,6 +184,35 @@ remove_duplicates <- function(cbop_year) {
   }
   rm(cbop_dupes)
   
+  #Job offers with different vacancies
+  cbop_dupes <- cbop_year %>% filter(duplicated(cbop_year, 
+                                       by=names(cbop_year)[!names(cbop_year) %in% 
+                                                    c('file','poz_lWolnychMiejsc',
+                                                      'poz_lWolnychMiejscDlaNiepeln')], 
+                                       fromLast = FALSE) == TRUE |
+                                      duplicated(cbop_year, 
+                                       by=names(cbop_year)[!names(cbop_year) %in% 
+                                                    c('file','poz_lWolnychMiejsc',
+                                                      'poz_lWolnychMiejscDlaNiepeln')], 
+                                       fromLast = TRUE) == TRUE) %>% 
+    select(hash, poz_lWolnychMiejsc, poz_lWolnychMiejscDlaNiepeln) %>% group_by(hash) %>%
+    summarise(poz_lWolnychMiejsc = sum(poz_lWolnychMiejsc), 
+              poz_lWolnychMiejscDlaNiepeln = sum(poz_lWolnychMiejscDlaNiepeln))
+  
+  cbop_year <- cbop_year %>% filter(duplicated(cbop_year, 
+                                       by=names(cbop_year)[!names(cbop_year) %in% 
+                                                    c('file','poz_lWolnychMiejsc',
+                                                      'poz_lWolnychMiejscDlaNiepeln')], 
+                                       fromLast = FALSE) == FALSE)
+  
+  for(i in cbop_dupes$hash) {
+    cbop_year$poz_lWolnychMiejsc[cbop_year$hash == i] <-
+      cbop_dupes$poz_lWolnychMiejsc[cbop_dupes$hash == i]
+    cbop_year$poz_lWolnychMiejscDlaNiepeln[cbop_year$hash == i] <-
+      cbop_dupes$poz_lWolnychMiejscDlaNiepeln[cbop_dupes$hash == i]
+  }
+  rm(cbop_dupes)
+  
   #TODO
   
   return(cbop_year)
@@ -173,29 +220,39 @@ remove_duplicates <- function(cbop_year) {
 ```
 
 ```{r}
+#2020
 #Number of unique hash/job offers
-n <- length(unique(cbop_2020$hash))
-diff_n <- length(cbop_2020$hash) - n
+n_2020 <- length(unique(cbop_2020$hash))
+diff_n_2020 <- length(cbop_2020$hash) - n_2020
 
 #Table with duplicates and with unique value
-cbop_duplicate <- cbop_2020 %>% get_dupes(hash)
+cbop_duplicate_2020 <- cbop_2020 %>% get_dupes(hash)
 
-cbop_unique <- setdiff(cbop_2020, cbop_duplicate[,-2,with=FALSE])
+cbop_unique_2020 <- setdiff(cbop_2020, cbop_duplicate_2020[,-2,with=FALSE])
 
 #Analysis - duplicates
-e_duplicate <- e_duplicate %>% arrange(desc(hash))
-tab_03141d <- e_duplicate %>% filter(hash == '03141d53cf41912a3d045fd56be42788')
+tab_03141d <- cbop_duplicate_2020 %>% filter(hash == '03141d53cf41912a3d045fd56be42788')
+
+#2022
+n_2022 <- length(unique(cbop_2022$hash))
+diff_n_2022 <- length(cbop_2022$hash) - n_2022
+
+#Table with duplicates and with unique value
+cbop_duplicate_2022 <- cbop_2022 %>% get_dupes(hash)
 
 ```
 
 ```{r}
 #Notatki
-#Różnice w war_wynagrodzenieBrutto
+#Różnice w war_wynagrodzenieBrutto!!!
 #war_stanowisko: "specjalista ds. handlowych-133"	i "133-specjalista ds. handlowych"
-#Chełm w różnych woj, powatach, gminach '6009fe476b0739ef6d3f8d9cb73e784d3'
+#Chełm w różnych woj, powiatach, gminach '6009fe476b0739ef6d3f8d9cb73e784d3'
 #ulica i brak ulicy....
-#war_opisWynagrodzenia '+ staz pracy  + 100% premii regulaminowej' lub '+ staz pracy  + 100% premii regulaminowej'
+#war_opisWynagrodzenia '+ staz pracy  + 100% premii regulaminowej' lub '+ staz pracy  + 10% premii regulaminowej'
 #'01c212874d7c2ec958210941dea962a5' - zupełnie inny kod zawodu
+#'05f6c30a31aa7dfb3d778c882d366946' - kilka zawodów
+#EURES TRUE
+#poz_kodKategoriiOferty
 
 ```
 
@@ -203,7 +260,7 @@ tab_03141d <- e_duplicate %>% filter(hash == '03141d53cf41912a3d045fd56be42788')
 #2020
 cbop_2020 <- list()
 files <- Sys.glob('data\\2020\\*.json')
-cbop_2020<- create_table(cbop_2020, files, columns_to_keep)
+cbop_2020<- create_table(cbop_2020, files)
 cbop_2020 <- remove_duplicates(cbop_2020)
 ```
 
@@ -211,7 +268,7 @@ cbop_2020 <- remove_duplicates(cbop_2020)
 #2022
 cbop_2022 <- list()
 files <- Sys.glob('data\\2022\\*.json')
-cbop_2022 <- create_table(cbop_2022, files, columns_to_keep)
+cbop_2022 <- create_table(cbop_2022, files)
 cbop_2022 <- remove_duplicates(cbop_2022)
 ```
 
@@ -221,12 +278,12 @@ files <- Sys.glob('data\\2021\\*.json')
 
 cbop_2021_1 <- list()
 files_1 <- files[1:floor(length(files)/2)]
-cbop_2021_1 <- create_table(cbop_2021_1, files_1, columns_to_keep)
+cbop_2021_1 <- create_table(cbop_2021_1, files_1)
 cbop_2021_1 <- remove_duplicates(cbop_2021_1)
 
 cbop_2021_2 <- list()
 files_2 <- files[(1+floor(length(files)/2)):length(files)]
-cbop_2021_2 <- create_table(cbop_2021_2, files_2, columns_to_keep)
+cbop_2021_2 <- create_table(cbop_2021_2, files_2)
 cbop_2021_2 <- remove_duplicates(cbop_2021_2)
 
 cbop_2021 <- rbindlist(list(cbop_2021_1, cbop_2021_2))
