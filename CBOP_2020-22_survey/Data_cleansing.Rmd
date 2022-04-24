@@ -134,6 +134,13 @@ remove_duplicates <- function(cbop_year) {
                                        by=names(cbop_year)[!names(cbop_year) %in% 
                                                     c('file','war_dataZakonczeniaPracy')], 
                                        fromLast = TRUE) == FALSE)
+  
+  #Actualised job offers - different salary
+  cbop_year <- cbop_year %>% filter(duplicated(cbop_year, 
+                                       by=names(cbop_year)[!names(cbop_year) %in% 
+                                                    c('file','war_wynagrodzenieBrutto',
+                                                      'war_wynagrodzenieBruttoZTypemStawki')], 
+                                       fromLast = TRUE) == FALSE)
 
   #Prolonged job offers and actualised job offers
   cbop_year <- cbop_year %>% filter(duplicated(cbop_year, 
@@ -221,47 +228,11 @@ remove_duplicates <- function(cbop_year) {
 
 ```{r}
 #2020
-#Number of unique hash/job offers
-n_2020 <- length(unique(cbop_2020$hash))
-diff_n_2020 <- length(cbop_2020$hash) - n_2020
-
-#Table with duplicates and with unique value
-cbop_duplicate_2020 <- cbop_2020 %>% get_dupes(hash)
-
-cbop_unique_2020 <- setdiff(cbop_2020, cbop_duplicate_2020[,-2,with=FALSE])
-
-#Analysis - duplicates
-tab_03141d <- cbop_duplicate_2020 %>% filter(hash == '03141d53cf41912a3d045fd56be42788')
-
-#2022
-n_2022 <- length(unique(cbop_2022$hash))
-diff_n_2022 <- length(cbop_2022$hash) - n_2022
-
-#Table with duplicates and with unique value
-cbop_duplicate_2022 <- cbop_2022 %>% get_dupes(hash)
-
-```
-
-```{r}
-#Notatki
-#Różnice w war_wynagrodzenieBrutto!!!
-#war_stanowisko: "specjalista ds. handlowych-133"	i "133-specjalista ds. handlowych"
-#Chełm w różnych woj, powiatach, gminach '6009fe476b0739ef6d3f8d9cb73e784d3'
-#ulica i brak ulicy....
-#war_opisWynagrodzenia '+ staz pracy  + 100% premii regulaminowej' lub '+ staz pracy  + 10% premii regulaminowej'
-#'01c212874d7c2ec958210941dea962a5' - zupełnie inny kod zawodu
-#'05f6c30a31aa7dfb3d778c882d366946' - kilka zawodów
-#EURES TRUE
-#poz_kodKategoriiOferty
-
-```
-
-```{r}
-#2020
 cbop_2020 <- list()
 files <- Sys.glob('data\\2020\\*.json')
 cbop_2020<- create_table(cbop_2020, files)
 cbop_2020 <- remove_duplicates(cbop_2020)
+rm(files)
 ```
 
 ```{r}
@@ -270,6 +241,7 @@ cbop_2022 <- list()
 files <- Sys.glob('data\\2022\\*.json')
 cbop_2022 <- create_table(cbop_2022, files)
 cbop_2022 <- remove_duplicates(cbop_2022)
+rm(files)
 ```
 
 ```{r}
@@ -286,16 +258,15 @@ files_2 <- files[(1+floor(length(files)/2)):length(files)]
 cbop_2021_2 <- create_table(cbop_2021_2, files_2)
 cbop_2021_2 <- remove_duplicates(cbop_2021_2)
 
+rm(files)
+rm(files_1)
+rm(files_2)
+
 cbop_2021 <- rbindlist(list(cbop_2021_1, cbop_2021_2))
 rm(cbop_2021_1)
 rm(cbop_2021_2)
 
 cbop_2021 <- remove_duplicates(cbop_2021)
-```
-
-```{r}
-#Useful columns
-#columns <- c('file', 'hash', 'poz_identyfikatorOferty', 'poz_kodZawodu',              'poz_grupaZawodu', 'poz_lWolnychMiejsc', 'poz_dataUdostepnieniaOferty',             'poz_dataPrzyjZglosz', 'poz_ofertaWaznaDo', 'poz_ofertaZgloszonaPrzez',              'poz_ofertaZgloszonaPrzezKodJednostki', 'war_kraj', 'war_wojewodztwo',             'war_kodWojewodztwa', 'war_powiat', 'war_kodPowiatu', 'war_gmina',             'war_miejscowosc', 'war_kodMiejscowosci', 'war_ulica', 'war_miejscePracy',             'war_zawod', 'war_stanowisko', 'war_wymiarEtatu', 'war_rodzajZatrudnienia',             'war_kodRodzajuZatrudnienia', 'war_pensjaNetto', 'prac_nazwaUrzeduPracy',             'prac_nip', 'prac_regon', 'statusOferty', 'kod_pocztowy')
 ```
 
 ```{r}
