@@ -8,8 +8,9 @@ library(RcppSimdJson)
 library(data.table)
 library("lubridate")
 library(tidyverse)
-library(janitor)
 library(stringi)
+library(scales)
+library(xtable)
 ```
 
 ```{r}
@@ -81,7 +82,7 @@ read_cbop <- function(file) {
 
 ```{r}
 #Chosen columns to keep
-columns_to_keep <- c('file', 'hash', 'prac_osobaDoKontaktu', 'prac_nrTelefonu', 'prac_nip', 'prac_nazwaUrzeduPracy', 'prac_regon', 'poz_kodZawodu', 'poz_zawod', 'poz_grupaZawodu', 'poz_lWolnychMiejsc', 'poz_kodKategoriiOferty', 'poz_udostepnionoDoEURES', 'poz_dlaPoborowych', 'poz_ofertaDlaOsobZarej', 'poz_identyfikatorOferty', 'poz_lWolnychMiejscDlaNiepeln', 'poz_finansZPfron', 'poz_ofertaWaznaDo', 'poz_ofertaZgloszonaPrzez', 'poz_ofertaZgloszonaPrzezKodJednostki', 'poz_dataPrzyjZglosz', 'war_dataZakonczeniaPracy', 'war_miejscePracyCzlonDrugi', 'war_zakresObowiazkow', 'war_opisOferty', 'war_rodzajZatrudnienia', 'war_miejscePracyCzlonPierwszy', 'war_lGodzinWMiesiacu', 'war_kodZmianowosci', 'war_wojewodztwo', 'war_kodWojewodztwa', 'war_ulica', 'war_powiat', 'war_kodPowiatu', 'war_zawod', 'war_gmina', 'war_opisWynagrodzenia', 'war_pracaWWolneDni', 'war_wynagrodzenieBrutto', 'war_nrBudynku', 'war_kodSystemuWynagradzania', 'war_nrLokalu', 'war_miejscePracy', 'war_lGodzinWTygodniu', 'war_stanowisko', 'war_dataRozpoczeciaPracy', 'war_wymiarEtatu', 'war_miejscowosc', 'war_zatrOdZaraz', 'war_kodMiejscowosci', 'war_pracaStala', 'war_wynagrodzenieBruttoZTypemStawki', 'war_zmianowosc', 'war_pracaTymczasowa', 'war_kodRodzajuZatrudnienia', 'kod_pocztowy')
+columns_to_keep <- c('file', 'hash', 'prac_osobaDoKontaktu', 'prac_nrTelefonu', 'prac_nip', 'prac_nazwaUrzeduPracy', 'prac_regon', 'poz_kodZawodu', 'poz_zawod', 'poz_grupaZawodu', 'poz_lWolnychMiejsc', 'poz_kodKategoriiOferty', 'poz_udostepnionoDoEURES', 'poz_dlaPoborowych', 'poz_ofertaDlaOsobZarej', 'poz_identyfikatorOferty', 'poz_lWolnychMiejscDlaNiepeln', 'poz_finansZPfron', 'poz_ofertaWaznaDo', 'poz_ofertaZgloszonaPrzez', 'poz_ofertaZgloszonaPrzezKodJednostki', 'poz_dataUdostepnieniaOferty', 'poz_dataPrzyjZglosz', 'war_dataZakonczeniaPracy', 'war_miejscePracyCzlonDrugi', 'war_zakresObowiazkow', 'war_opisOferty', 'war_rodzajZatrudnienia', 'war_miejscePracyCzlonPierwszy', 'war_lGodzinWMiesiacu', 'war_kodZmianowosci', 'war_wojewodztwo', 'war_kodWojewodztwa', 'war_ulica', 'war_powiat', 'war_kodPowiatu', 'war_zawod', 'war_gmina', 'war_opisWynagrodzenia', 'war_pracaWWolneDni', 'war_wynagrodzenieBrutto', 'war_nrBudynku', 'war_kodSystemuWynagradzania', 'war_nrLokalu', 'war_miejscePracy', 'war_lGodzinWTygodniu', 'war_stanowisko', 'war_dataRozpoczeciaPracy', 'war_wymiarEtatu', 'war_miejscowosc', 'war_zatrOdZaraz', 'war_kodMiejscowosci', 'war_pracaStala', 'war_wynagrodzenieBruttoZTypemStawki', 'war_zmianowosc', 'war_pracaTymczasowa', 'war_kodRodzajuZatrudnienia', 'kod_pocztowy')
 ```
 
 ```{r}
@@ -98,11 +99,6 @@ create_table <- function(cbop_year, files) {
   cbop_year$file <- ymd(cbop_year$file)
   
   cbop_year <- cbop_year[, ..columns_to_keep]
-  
-  for (i in columns_to_keep) {
-    if (is.character(cbop_year[[i]]) == TRUE) cbop_year[[i]] <-
-    stri_trans_general(cbop_year[[i]], 'pl-ascii')
-  }
 
   return(cbop_year)
 }
@@ -111,29 +107,48 @@ create_table <- function(cbop_year, files) {
 ```{r}
 remove_duplicates <- function(cbop_year) {
   
+  vector_year_stat <- c()
+  vector_year_stat <- append(vector_year_stat, length(cbop_year$hash))
+  
   #Identical job offers
   cbop_year <- cbop_year %>% filter(duplicated(cbop_year,
                                                by=names(cbop_year)[names(cbop_year)
                                                                    !='file'], 
                                        fromLast = TRUE) == FALSE)
+  vector_year_stat <- append(vector_year_stat, length(cbop_year$hash))
+  
+  #Spelling mistakes
+  for (i in columns_to_keep) {
+    if (is.character(cbop_year[[i]]) == TRUE) cbop_year[[i]] <-
+    stri_trans_general(cbop_year[[i]], 'pl-ascii')
+  }
+  
+  cbop_year <- cbop_year %>% filter(duplicated(cbop_year,
+                                               by=names(cbop_year)[names(cbop_year)
+                                                                   !='file'], 
+                                       fromLast = TRUE) == FALSE)
+  vector_year_stat <- append(vector_year_stat, length(cbop_year$hash))
   
   #Prolonged job offers
   cbop_year <- cbop_year %>% filter(duplicated(cbop_year, 
                                        by=names(cbop_year)[!names(cbop_year) %in% 
                                                     c('file','poz_ofertaWaznaDo')], 
                                        fromLast = TRUE) == FALSE)
+  vector_year_stat <- append(vector_year_stat, length(cbop_year$hash))
   
   #Actualised job offers - different start date
   cbop_year <- cbop_year %>% filter(duplicated(cbop_year, 
                                        by=names(cbop_year)[!names(cbop_year) %in% 
                                                     c('file','war_dataRozpoczeciaPracy')], 
                                        fromLast = TRUE) == FALSE)
+  vector_year_stat <- append(vector_year_stat, length(cbop_year$hash))
   
   #Actualised job offers - different end date
   cbop_year <- cbop_year %>% filter(duplicated(cbop_year, 
                                        by=names(cbop_year)[!names(cbop_year) %in% 
                                                     c('file','war_dataZakonczeniaPracy')], 
                                        fromLast = TRUE) == FALSE)
+  vector_year_stat <- append(vector_year_stat, length(cbop_year$hash))
   
   #Actualised job offers - different salary
   cbop_year <- cbop_year %>% filter(duplicated(cbop_year, 
@@ -141,6 +156,7 @@ remove_duplicates <- function(cbop_year) {
                                                     c('file','war_wynagrodzenieBrutto',
                                                       'war_wynagrodzenieBruttoZTypemStawki')], 
                                        fromLast = TRUE) == FALSE)
+  vector_year_stat <- append(vector_year_stat, length(cbop_year$hash))
 
   #Prolonged job offers and actualised job offers
   cbop_year <- cbop_year %>% filter(duplicated(cbop_year, 
@@ -161,6 +177,7 @@ remove_duplicates <- function(cbop_year) {
                                                       'war_dataRozpoczeciaPracy',
                                                       'war_dataZakonczeniaPracy')], 
                                        fromLast = TRUE) == FALSE)
+  vector_year_stat <- append(vector_year_stat, length(cbop_year$hash))
   
   #Job offers with different phone no.
   cbop_dupes <- cbop_year %>% filter(duplicated(cbop_year, 
@@ -190,6 +207,7 @@ remove_duplicates <- function(cbop_year) {
       cbop_dupes$poz_lWolnychMiejscDlaNiepeln[cbop_dupes$hash == i]
   }
   rm(cbop_dupes)
+  vector_year_stat <- append(vector_year_stat, length(cbop_year$hash))
   
   #Job offers with different vacancies
   cbop_dupes <- cbop_year %>% filter(duplicated(cbop_year, 
@@ -219,11 +237,18 @@ remove_duplicates <- function(cbop_year) {
       cbop_dupes$poz_lWolnychMiejscDlaNiepeln[cbop_dupes$hash == i]
   }
   rm(cbop_dupes)
+  vector_year_stat <- append(vector_year_stat, length(cbop_year$hash))
   
-  #TODO
+  #Add new column
+  stats_tab <<- cbind(stats_tab, year = vector_year_stat)
   
   return(cbop_year)
 }
+```
+
+```{r}
+#Table to stats
+stats_tab <- data.table(duplication_type = c('Base value', 'Identical', 'Spelling mistakes', 'Prolonged', 'Actualised - different start date', 'Actualised - different end date', 'Actualised - different salary', 'Prolonged and actualised', 'Different contact data', 'Different number of vacancies'))
 ```
 
 ```{r}
@@ -232,15 +257,6 @@ cbop_2020 <- list()
 files <- Sys.glob('data\\2020\\*.json')
 cbop_2020<- create_table(cbop_2020, files)
 cbop_2020 <- remove_duplicates(cbop_2020)
-rm(files)
-```
-
-```{r}
-#2022
-cbop_2022 <- list()
-files <- Sys.glob('data\\2022\\*.json')
-cbop_2022 <- create_table(cbop_2022, files)
-cbop_2022 <- remove_duplicates(cbop_2022)
 rm(files)
 ```
 
@@ -270,9 +286,42 @@ cbop_2021 <- remove_duplicates(cbop_2021)
 ```
 
 ```{r}
+#2022
+cbop_2022 <- list()
+files <- Sys.glob('data\\2022\\*.json')
+cbop_2022 <- create_table(cbop_2022, files)
+cbop_2022 <- remove_duplicates(cbop_2022)
+rm(files)
+```
+
+```{r}
 #2020-2022 All
 cbop_all <- rbindlist(list(cbop_2020, cbop_2021, cbop_2022))
 cbop_all <- remove_duplicates(cbop_all)
+```
+
+```{r}
+#Table with stats - n
+colnames(stats_tab) <- c('duplication_type', '2020', '2021_1', '2021_2', '2021_s', '2022', 'all')
+
+stats_tab[, '2021'] <- stats_tab[,'2021_1'] + stats_tab[,'2021_2'] - cumsum(rbind(stats_tab[1,'2021_s'], stats_tab[1:9,'2021_s']) - stats_tab[,'2021_s'])
+stats_tab <- subset(stats_tab, select = -c(3,4,5))
+
+stats_tab[, 'all'] <- stats_tab[,'2021'] + stats_tab[,'2020'] + stats_tab[,'2022'] - cumsum(rbind(stats_tab[1,'all'], stats_tab[1:9,'all']) - stats_tab[,'all'])
+
+stats_tab <- stats_tab %>% select('duplication_type', '2020', '2021', '2022', 'all')
+
+stats_tab <- rbind(stats_tab, cbind('duplication_type' = 'Sum of duplicates', stats_tab[1,2:5]-stats_tab[10,2:5]))
+
+#Table with stats - %
+stats_tab_p <- cbind(stats_tab[,1], rbind(stats_tab[1,2:5], stats_tab[1:10,2:5]) - stats_tab[,2:5])
+stats_tab_p <- stats_tab_p[-c(1,11),]
+
+stats_tab_p[,2:5] <- cbind(
+  list(percent(round(as.numeric(unlist(prop.table(stats_tab_p[,2]))),digit = 5))),
+  list(percent(round(as.numeric(unlist(prop.table(stats_tab_p[,3]))),digit = 5))),
+  list(percent(round(as.numeric(unlist(prop.table(stats_tab_p[,4]))),digit = 5))),
+  list(percent(round(as.numeric(unlist(prop.table(stats_tab_p[,5]))),digit = 5))))
 ```
 
 ```{r}
