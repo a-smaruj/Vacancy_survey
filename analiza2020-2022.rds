@@ -1,0 +1,392 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+library(tidyverse)
+library(lubridate)
+library(dplyr)
+
+```
+
+
+```{r}
+CBOP_all = data.frame()
+
+
+    CBOP_all <- readRDS('C:\\Users\\paula\\OneDrive\\Pulpit\\cbop\\cbop_all.rds')
+
+    
+    #Korekta tabel, zmiana typu kolumny poz_dataUdostepnieniaOferty z char na date
+    
+   CBOP_all$poz_dataUdostepnieniaOferty<- as.Date(CBOP_all$poz_dataUdostepnieniaOferty, "%d.%m.%Y")
+
+
+```
+```{r}
+
+#usunięcie wierszy zawierający NA
+
+CBOP_all <- na.omit(CBOP_all, c("poz_dataUdostepnieniaOferty", "poz_ofertaWaznaDo"))
+
+
+
+```
+```{r}
+
+#1 przedstawiciele władz publicznych, urzędnicy, kierownicy
+#2 Specjaliści - wysokie stanowiska
+#3 Technicy i średni personel
+#4 Pracownicy biurowi
+#5 Pracownicy usług i sprzedawcy
+#6 Rolnicy, ogrodnicy, rybacy 
+#7 Robotnicy przemysłowi i rzemieślnicy
+#8 Operatorzy i monterzy maszyn i urządzeń
+#9 Pracownicy wykonujący prace proste
+#0 Siły zbrojne
+
+
+CBOP_all<-CBOP_all %>%
+  mutate(occupational_group = case_when(
+    startsWith(poz_kodZawodu, "1") ~ "1",
+    startsWith(poz_kodZawodu, "2") ~ "2",
+    startsWith(poz_kodZawodu, "3") ~ "3",
+    startsWith(poz_kodZawodu, "4") ~ "4",
+    startsWith(poz_kodZawodu, "5") ~ "5",
+    startsWith(poz_kodZawodu, "6") ~ "6",
+    startsWith(poz_kodZawodu, "7") ~ "7",
+    startsWith(poz_kodZawodu, "8") ~ "8",
+    startsWith(poz_kodZawodu, "9") ~ "9",
+    startsWith(poz_kodZawodu, "0") ~ "0",
+    ))
+```
+
+```{r}
+
+
+#korekcja - biezremy pod uwagę jedynie oferty króe były udostęppnione i ważne od 2020 roku do 2022
+
+CBOP_all <- CBOP_all %>% filter(CBOP_all$poz_dataUdostepnieniaOferty %within% interval( "2020-01-01", "2022-12-31"))
+CBOP_2020 <- CBOP_all %>% filter(CBOP_all$poz_dataUdostepnieniaOferty %within% interval( "2020-01-01", "2020-12-31"))
+CBOP_2021 <- CBOP_all %>% filter(CBOP_all$poz_dataUdostepnieniaOferty %within% interval( "2021-01-01", "2021-12-31"))
+CBOP_2022 <- CBOP_all %>% filter(CBOP_all$poz_dataUdostepnieniaOferty %within% interval( "2022-01-01", "2022-12-31"))
+
+
+
+```
+
+```{r}
+
+
+#Ilość wolnych miejsc pracy na przestrzenni lat
+
+n_vacancy_cf <- data.frame(years = c("2020","2021","2022"),
+                           vanacies=c(sum(CBOP_all$poz_lWolnychMiejsc[CBOP_all$poz_dataUdostepnieniaOferty %within% interval( "2020-01-01", "2020-12-31")]), sum(CBOP_all$poz_lWolnychMiejsc[CBOP_all$poz_dataUdostepnieniaOferty %within% interval( "2021-01-01", "2021-12-31")]), sum(CBOP_all$poz_lWolnychMiejsc[CBOP_all$poz_dataUdostepnieniaOferty %within% interval( "2022-01-01", "2022-12-31")])
+                                     ))
+
+ggplot(data = n_vacancy_cf, aes(x = years, y =vanacies)) +
+  geom_bar(stat = "identity", fill = "blue")
+
+
+#All years
+all_years_vacancy <- data.frame(years = CBOP_all$poz_dataUdostepnieniaOferty,
+                           vanacies=CBOP_all$poz_lWolnychMiejsc)
+
+
+
+ggplot(data = all_years_vacancy, aes(x = years, y = vanacies)) +
+  geom_point()
+
+
+
+
+```
+
+
+
+```{r}
+
+#Ilość oferowanych stanowisk pracy w 2020
+
+number_of_offert_2020 <- aggregate(CBOP_2020$poz_lWolnychMiejsc,
+                                by=list(Category=CBOP_2020$poz_dataUdostepnieniaOferty),
+                                FUN=sum)
+
+ggplot(data = number_of_offert_2020, 
+       aes(x = Category, y = x)) +
+  geom_point()
+
+```
+
+
+```{r}
+#Ilość oferowanych stanowisk pracy w 2021
+
+
+number_of_offert_2021 <- aggregate(CBOP_2021$poz_lWolnychMiejsc,
+                                by=list(Category=CBOP_2021$poz_dataUdostepnieniaOferty),
+                                FUN=sum)
+
+ggplot(data = number_of_offert_2021 , 
+       aes(x = Category, y = x)) +
+  geom_point()
+
+```
+
+
+
+```{r}
+#Ilość oferowanych stanowisk pracy w 2022
+
+year2022_vacancy <- data.frame(years = CBOP_2022$poz_dataUdostepnieniaOferty,
+                           vanacies=CBOP_2022$poz_lWolnychMiejsc)
+
+
+
+
+number_of_offert_2022 <- aggregate(CBOP_2022$poz_lWolnychMiejsc,
+                                by=list(Category=CBOP_2022$poz_dataUdostepnieniaOferty),
+                                FUN=sum)
+
+ggplot(data = number_of_offert_2022, 
+       aes(x = Category, y = x)) +
+  geom_point()
+
+
+```
+
+
+\
+
+
+
+```{r}
+#Zapotrzebowanie na poszczególne grupy zawodów w 2020
+
+
+occupation_code_2020 <-CBOP_2020 %>%group_by(occupational_group,poz_dataUdostepnieniaOferty)%>%summarise(vacancy=sum(poz_lWolnychMiejsc))
+
+
+occupation_code_2020
+
+
+ggplot(data = occupation_code_2020) +
+  geom_bar(aes(x =poz_dataUdostepnieniaOferty, y = vacancy), stat='identity') +
+  theme_bw()+facet_wrap(~occupational_group)
+
+
+
+
+```
+
+
+
+```{r}
+#Zapotrzebowanie na poszczególne grupy zawodów w 2021
+
+occupation_code_2021 <-CBOP_2021 %>%group_by(occupational_group,poz_dataUdostepnieniaOferty)%>%summarise(vacancy=sum(poz_lWolnychMiejsc))
+
+
+occupation_code_2021
+
+
+ggplot(data = occupation_code_2021) +
+  geom_bar(aes(x =poz_dataUdostepnieniaOferty, y = vacancy), stat='identity') +
+  theme_bw()+facet_wrap(~occupational_group)
+```
+
+
+
+
+```{r}
+#Zapotrzebowanie na poszczególne grupy zawodów w 2022
+
+
+
+occupation_code_2022 <-CBOP_2022%>%group_by(occupational_group,poz_dataUdostepnieniaOferty)%>%summarise(vacancy=sum(poz_lWolnychMiejsc))
+
+
+occupation_code_2022
+
+
+ggplot(data = occupation_code_2022) +
+  geom_bar(aes(x =poz_dataUdostepnieniaOferty, y = vacancy), stat='identity') +
+  theme_bw()+facet_wrap(~occupational_group)
+
+
+
+```
+
+
+
+```{r}
+#Vacancy through years group by kod_zawodu
+
+occupation_code_all <-CBOP_all_with_ocgr%>%group_by(occupational_group,poz_dataUdostepnieniaOferty)%>%summarise(vacancy=sum(poz_lWolnychMiejsc))
+
+ggplot(data = occupation_code_all) +
+  geom_point(aes(x =poz_dataUdostepnieniaOferty, y = vacancy)) +
+  theme_bw() +
+  facet_wrap(~occupational_group)
+
+
+  ggplot(data = occupation_code_all) +
+  geom_bar(aes(x =poz_dataUdostepnieniaOferty, y = vacancy), stat='identity') +
+  theme_bw()+facet_wrap(~occupational_group)
+
+```
+
+
+
+
+```{r}
+#Zapotrzebowanie na poszczególne grupy zawodowe na przestrzeni lat 2020-2022
+
+occupation_code_all <-CBOP_all%>%
+   mutate(year = format(poz_dataUdostepnieniaOferty, format="%Y"))%>%group_by( year,occupational_group)%>%summarise(vacancy=sum(poz_lWolnychMiejsc))
+
+
+
+ggplot(data = occupation_code_all) +
+  geom_bar(aes(x = occupational_group, y = vacancy), stat='identity') +
+  theme_bw() +
+  facet_wrap(~year)
+
+
+ggplot(data = occupation_code_all) +
+  geom_point(aes(x = occupational_group, y = vacancy)) +
+  theme_bw() +
+  facet_wrap(~year)
+
+
+
+
+```
+
+
+
+```{r}
+#Ilość ofert na przestrzeni lat 2020-2022 w zależności od województwa
+occupancies_provinces <-  CBOP_all%>%mutate(war_wojewodztwo = substr(as.character(war_kodPowiatu), 1, 2))%>% group_by(poz_dataUdostepnieniaOferty, war_wojewodztwo) %>%summarise(vacancy=sum(poz_lWolnychMiejsc))
+
+ggplot(data = occupancies_provinces) +
+  geom_point(aes(x =poz_dataUdostepnieniaOferty, y = vacancy)) +
+  theme_bw() +
+  facet_wrap(~war_wojewodztwo)
+
+
+```
+
+
+
+
+```{r}
+# Ilość ofert na przestrzeni lat 2020-2022 w zależności od województwa par2
+
+
+
+vacancy_provinces <- CBOP_all%>%mutate(war_wojewodztwo = substr(as.character(war_kodPowiatu), 1, 2),year = format(poz_dataUdostepnieniaOferty, format="%Y")) %>% 
+  group_by(year, war_wojewodztwo) %>%
+  summarise(vacancy=sum(poz_lWolnychMiejsc))
+
+ggplot(data = vacancy_provinces) +
+  geom_bar(aes(x = war_wojewodztwo, y = vacancy), stat='identity') +
+  theme_bw() +
+  facet_wrap(~year)
+
+ggplot(data = vacancy_provinces %>% filter(!is.na(war_wojewodztwo))) +
+  geom_bar(aes(x = war_wojewodztwo, y = vacancy), stat='identity') +
+  theme_bw() +
+  facet_wrap(~year)
+
+```
+```{r}
+
+#Popularność rodzajów umów zatrudnienia w latach 2020-2022
+#Vacancy through years group by umowa
+
+#war_kodRodzajuZatrudnienia
+
+contract_type_years <-CBOP_all %>% 
+  mutate(year = format(poz_dataUdostepnieniaOferty, format="%Y")) %>%
+  group_by(year,war_rodzajZatrudnienia ) %>%
+  summarise(vacancy=sum(poz_lWolnychMiejsc))
+
+ggplot(data = contract_type_years) +
+  geom_bar(aes(x = war_rodzajZatrudnienia, y = vacancy), stat = 'identity') +
+  theme_bw() +
+  coord_flip() +
+  facet_wrap(~year)
+
+
+
+```
+
+
+
+
+
+```{r}
+
+#Ilość oferowanych w ofertach zatrudnieni na podstawie "Umowy o pracę na czas określony"
+
+contract_type1_years <-CBOP_all %>% 
+  filter(war_rodzajZatrudnienia %in% "Umowa o pracę na czas określony")
+
+contract_type1_years <- aggregate(contract_type1_years$poz_lWolnychMiejsc,
+                                by=list(Category=contract_type1_years$poz_dataUdostepnieniaOferty),
+                                FUN=sum)
+
+ggplot(data = contract_type1_years, 
+       aes(x = Category, y = x)) +
+  geom_point()
+```
+
+```{r}
+#Ilość oferowanych w ofertach zatrudnieni na podstawie "Umowa o pracę na okres próbny"
+
+contract_type4_years <-CBOP_all %>% 
+  filter(war_rodzajZatrudnienia %in% "Umowa o pracę na okres próbny")
+
+contract_type4_years <- aggregate(contract_type4_years$poz_lWolnychMiejsc,
+                                by=list(Category=contract_type4_years$poz_dataUdostepnieniaOferty),
+                                FUN=sum)
+
+ggplot(data = contract_type4_years, 
+       aes(x = Category, y = x)) +
+  geom_point()
+
+```
+
+```{r}
+
+#Ilość oferowanych w ofertach zatrudnieni na podstawie "Umowa o pracę na czas nieokreślony"
+
+contract_type2_years <-CBOP_all %>% 
+  filter(war_rodzajZatrudnienia %in% 'Umowa o pracę na czas nieokreślony')
+
+contract_type2_years <- aggregate(contract_type2_years$poz_lWolnychMiejsc,
+                                by=list(Category=contract_type2_years$poz_dataUdostepnieniaOferty),
+                                FUN=sum)
+
+ggplot(data = contract_type2_years, 
+       aes(x = Category, y = x)) +
+  geom_point()
+```
+
+```{r}
+
+#Ilość oferowanych w ofertach zatrudnieni na podstawie "Umowa o pracę w zastępstwie"
+contract_type3_years <-CBOP_all %>% 
+  filter(war_rodzajZatrudnienia %in% 'Umowa o pracę w zastępstwie')
+
+contract_type3_years <- aggregate(contract_type3_years$poz_lWolnychMiejsc,
+                                by=list(Category=contract_type3_years$poz_dataUdostepnieniaOferty),
+                                FUN=sum)
+
+ggplot(data = contract_type3_years, 
+       aes(x = Category, y = x)) +
+  geom_point()
+```
+
