@@ -10,7 +10,6 @@ library("lubridate")
 library(tidyverse)
 library(stringi)
 library(scales)
-library(xtable)
 ```
 
 ```{r}
@@ -74,7 +73,7 @@ read_cbop <- function(file) {
   final_df[, poz_kodZawodu := str_remove(poz_kodZawodu, "RPd057\\|")]
   final_df[, poz_grupaZawodu := substr(poz_kodZawodu, 1, 1)]
   final_df[, prac_regon := substr(prac_regon, 1, 9)]
-  final_df[, poz_dataUdostepnieniaOferty := ymd(poz_dataUdostepnieniaOferty)]
+  final_df[, poz_dataUdostepnieniaOferty := dmy(poz_dataUdostepnieniaOferty)]
 
   return(final_df)
 }
@@ -255,7 +254,7 @@ stats_tab <- data.table(duplication_type = c('Base value', 'Identical', 'Spellin
 #2020
 cbop_2020 <- list()
 files <- Sys.glob('data\\2020\\*.json')
-cbop_2020<- create_table(cbop_2020, files)
+cbop_2020 <- create_table(cbop_2020, files)
 cbop_2020 <- remove_duplicates(cbop_2020)
 rm(files)
 ```
@@ -315,7 +314,7 @@ stats_tab <- rbind(stats_tab, cbind('duplication_type' = 'Sum of duplicates', st
 
 #Table with stats - %
 stats_tab_p <- cbind(stats_tab[,1], rbind(stats_tab[1,2:5], stats_tab[1:10,2:5]) - stats_tab[,2:5])
-stats_tab_p <- stats_tab_p[-c(1,11),]
+stats_tab_p <- stats_tab_p[-c(1,2,11),]
 
 stats_tab_p[,2:5] <- cbind(
   list(percent(round(as.numeric(unlist(prop.table(stats_tab_p[,2]))),digit = 5))),
@@ -330,4 +329,6 @@ saveRDS(cbop_2020, file = "cbop_2020.rds")
 saveRDS(cbop_2021, file = "cbop_2021.rds")
 saveRDS(cbop_2022, file = "cbop_2022.rds")
 saveRDS(cbop_all, file = "cbop_all.rds")
+saveRDS(stats_tab, file = "stats_tab.rds")
+saveRDS(stats_tab_p, file = "stats_tab_p.rds")
 ```
