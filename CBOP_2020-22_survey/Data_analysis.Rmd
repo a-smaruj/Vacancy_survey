@@ -3,40 +3,60 @@ title: "R Notebook"
 output: html_notebook
 ---
 
-
 ```{r}
 library(tidyverse)
 library(lubridate)
-library(dplyr)
-library(ggplot2)
 library(reshape2)
-
 ```
 
-
 ```{r}
-CBOP_all = data.frame()
-
-
-    CBOP_all <- readRDS('C:\\Users\\paula\\OneDrive\\Pulpit\\cbop\\cbop_all.rds')
-
-
-  #Correction of tables, change of type of column pos_dateOfferingOffering from char to date
-    
-   CBOP_all$poz_dataUdostepnieniaOferty <- as.Date(CBOP_all$poz_dataUdostepnieniaOferty, "%d.%m.%Y")
-   
-str(CBOP_all)
+#Load data
+CBOP_all <- readRDS('data\\rds\\cbop_all.rds')
+CBOP_2020 <- readRDS('data\\rds\\cbop_2020.rds')
+CBOP_2021 <- readRDS('data\\rds\\cbop_2021.rds')
+CBOP_2022 <- readRDS('data\\rds\\cbop_2022.rds')
 ```
+
 ```{r}
+#Number of vacancies per day - function
+n_vacancy_plot <- function(CBOP_year, startDate, endDate) {
+  datesOfAnalysis <- seq(as.Date(startDate), as.Date(endDate), by = "day")
 
-#delete rows containing NA
-
-#CBOP_all <- na.omit(CBOP_all, c("pos_dateOfferAvailability", "pos_offerValuableTo"))
-
-
-
+  n_vacancy <- data.frame(date = datesOfAnalysis, vacancy = 0)
+  
+  for (i in 1:length(datesOfAnalysis)) {
+     n_vacancy[i, 2] <- 
+       sum(CBOP_year$poz_lWolnychMiejsc[which(datesOfAnalysis[i] %within% interval(CBOP_year$poz_dataUdostepnieniaOferty,CBOP_year$poz_ofertaWaznaDo))]) +
+       sum(CBOP_year$poz_lWolnychMiejscDlaNiepeln[which(datesOfAnalysis[i] %within% interval(CBOP_year$poz_dataUdostepnieniaOferty,CBOP_year$poz_ofertaWaznaDo))])
+  }
+  
+  n_plot <- ggplot(data = n_vacancy, aes(x = date, y = vacancy)) +
+    geom_bar(stat = "identity", fill = "blue") +
+    labs(title = paste0('Number of vacancies per day over the period ',
+                        startDate, '-', endDate, ''),
+         y = 'vacancy', x ='')
+  
+  return(n_plot)
+}
 ```
+
 ```{r}
+#Number of vacancies per day
+n_vacancy_plot_all <- n_vacancy_plot(CBOP_all, "2020/09/28", "2022/02/17")
+print(n_vacancy_plot_all)
+
+n_vacancy_plot_2020 <- n_vacancy_plot(CBOP_2020, "2020/09/28", "2020/12/31")
+print(n_vacancy_plot_2020)
+
+n_vacancy_plot_2021 <- n_vacancy_plot(CBOP_2021, "2021/01/01", "2021/12/31")
+print(n_vacancy_plot_2021)
+
+n_vacancy_plot_2022 <- n_vacancy_plot(CBOP_2022, "2022/01/01", "2022/02/17")
+print(n_vacancy_plot_2022)
+```
+
+```{r}
+# Ocupational groups based on job code
 
 #1 Public officials, officers, managers
 #2 Professionals - high positions
@@ -48,567 +68,165 @@ str(CBOP_all)
 #8 Plant and machine operators and assemblers
 #9 Employees performing simple work
 #0 Armed forces
-
-
-CBOP_all<-CBOP_all %>%
-  mutate(occupational_group = case_when(
-    startsWith(poz_kodZawodu, "1") ~ "1",
-    startsWith(poz_kodZawodu, "2") ~ "2",
-    startsWith(poz_kodZawodu, "3") ~ "3",
-    startsWith(poz_kodZawodu, "4") ~ "4",
-    startsWith(poz_kodZawodu, "5") ~ "5",
-    startsWith(poz_kodZawodu, "6") ~ "6",
-    startsWith(poz_kodZawodu, "7") ~ "7",
-    startsWith(poz_kodZawodu, "8") ~ "8",
-    startsWith(poz_kodZawodu, "9") ~ "9",
-    startsWith(poz_kodZawodu, "0") ~ "0",
-    ))
 ```
 
 ```{r}
-
-
-#correction - we only take into account offers that were made available and valid from 2020 to 2022
-
-CBOP_all <- CBOP_all %>% filter(interval(CBOP_all$poz_dataUdostepnieniaOferty, CBOP_all$poz_ofertaWaznaDo) %within% interval( "2020-01-01", "2022-12-31"))
-
-
-CBOP_2020 <- CBOP_all %>% filter(interval(CBOP_all$poz_dataUdostepnieniaOferty, CBOP_all$poz_ofertaWaznaDo) %within% interval( "2020-01-01", "2020-12-31"))
-CBOP_2021 <- CBOP_all %>% filter(interval(CBOP_all$poz_dataUdostepnieniaOferty, CBOP_all$poz_ofertaWaznaDo) %within% interval( "2021-01-01", "2021-12-31"))
-CBOP_2022 <- CBOP_all %>% filter(interval(CBOP_all$poz_dataUdostepnieniaOferty, CBOP_all$poz_ofertaWaznaDo) %within% interval( "2022-01-01", "2022-12-31"))
-
-
-
-```
-
-```{r}
-#Number of current offers per day
-
-datesOfAnalysis<-seq(as.Date("2020/01/01"), by = "day", length.out = 1095)
-
-n_vacancy  <- data.frame(years = datesOfAnalysis, vanacies= c(1:1095))
-print(n_vacancy)
-
-for (i in 1:1095) {
-   n_vacancy[ i, 2] <- c(sum(CBOP_all$poz_lWolnychMiejsc[which(datesOfAnalysis[i] %within% interval(CBOP_all$poz_dataUdostepnieniaOferty,CBOP_all$poz_ofertaWaznaDo))]))
-}
-
-
-ggplot(data = n_vacancy, aes(x = years, y =vanacies)) +
-  geom_bar(stat = "identity", fill = "blue")
-
-
-
-
-
-```
-
-
-
-```{r}
-
-#Number of jobs on offer in 2020
-
-datesOf2020<-seq(as.Date("2020/01/01"), by = "day", length.out = 366)
-number_of_offert_2020  <-  data.frame(dates= datesOf2020,vacancies= c(1:366))
-
-for (i in 1:366) {
-   number_of_offert_2020 [ i, 2] <- c(sum(CBOP_all$poz_lWolnychMiejsc[which(datesOf2020[i] %within% interval(CBOP_all$poz_dataUdostepnieniaOferty,CBOP_all$poz_ofertaWaznaDo))]))
-}
-
-
-ggplot(data = number_of_offert_2020 , 
-       aes(x =dates , y = vacancies)) +
-  geom_point()
-
-```
-
-
-```{r}
-#Number of jobs on offer in 2021
-
-datesOf2021<-seq(as.Date("2021/01/01"), by = "day", length.out = 365)
-number_of_offert_2021  <-  data.frame(dates= datesOf2021,vacancies= c(1:365))
-
-for (i in 1:365) {
-   number_of_offert_2021 [ i, 2] <- c(sum(CBOP_all$poz_lWolnychMiejsc[which(datesOf2021[i] %within% interval(CBOP_all$poz_dataUdostepnieniaOferty,CBOP_all$poz_ofertaWaznaDo))]))
-}
-
-
-ggplot(data = number_of_offert_2021 , 
-       aes(x =dates , y = vacancies)) +
-  geom_point()
-
-```
-
-
-
-```{r}
-#Number of jobs on offer in 2022
-datesOf2022<-seq(as.Date("2022/01/01"), by = "day", length.out = 365)
-number_of_offert_2022  <-  data.frame(dates= datesOf2022,vacancies= c(1:365))
-
-for (i in 1:365) {
-   number_of_offert_2022 [ i, 2] <- c(sum(CBOP_all$poz_lWolnychMiejsc[which(datesOf2022[i] %within% interval(CBOP_all$poz_dataUdostepnieniaOferty,CBOP_all$poz_ofertaWaznaDo))]))
-}
-
-
-ggplot(data = number_of_offert_2022 , 
-       aes(x =dates , y = vacancies)) +
-  geom_point()
-
-```
-
-
-
-
-
-
-```{r}
-#Demand for specific job groups in 2020
-occupation_code_2020 <-  data.frame(dates= datesOf2020,group1= c(1:366),group2= c(1:366),group3= c(1:366),group4= c(1:366),group5= c(1:366),group6= c(1:366),group7= c(1:366), group8= c(1:366), group9= c(1:366), group0= c(1:366))
-
-
-for (i in 1:366) {
-   occupation_code_2020  [ i, 2] <- c(sum(CBOP_2020$poz_lWolnychMiejsc[which(datesOf2020[i] %within% interval(CBOP_2020$poz_dataUdostepnieniaOferty,CBOP_2020$poz_ofertaWaznaDo) & CBOP_2020$occupational_group == "1")]))
-   occupation_code_2020  [ i, 3] <- c(sum(CBOP_2020$poz_lWolnychMiejsc[which(datesOf2020[i] %within% interval(CBOP_2020$poz_dataUdostepnieniaOferty,CBOP_2020$poz_ofertaWaznaDo) & CBOP_2020$occupational_group == "2")]))
-   
-    occupation_code_2020  [ i, 4] <- c(sum(CBOP_2020$poz_lWolnychMiejsc[which(datesOf2020[i] %within% interval(CBOP_2020$poz_dataUdostepnieniaOferty,CBOP_2020$poz_ofertaWaznaDo) & CBOP_2020$occupational_group == "3")]))
-   occupation_code_2020  [ i, 5] <- c(sum(CBOP_2020$poz_lWolnychMiejsc[which(datesOf2020[i] %within% interval(CBOP_2020$poz_dataUdostepnieniaOferty,CBOP_2020$poz_ofertaWaznaDo) & CBOP_2020$occupational_group == "4")]))
-   
-    occupation_code_2020  [ i, 6] <- c(sum(CBOP_2020$poz_lWolnychMiejsc[which(datesOf2020[i] %within% interval(CBOP_2020$poz_dataUdostepnieniaOferty,CBOP_2020$poz_ofertaWaznaDo) & CBOP_2020$occupational_group == "5")]))
-   occupation_code_2020  [ i, 7] <- c(sum(CBOP_2020$poz_lWolnychMiejsc[which(datesOf2020[i] %within% interval(CBOP_2020$poz_dataUdostepnieniaOferty,CBOP_2020$poz_ofertaWaznaDo) & CBOP_2020$occupational_group == "6")]))
-   
-    occupation_code_2020  [ i, 8] <- c(sum(CBOP_2020$poz_lWolnychMiejsc[which(datesOf2020[i] %within% interval(CBOP_2020$poz_dataUdostepnieniaOferty,CBOP_2020$poz_ofertaWaznaDo) & CBOP_2020$occupational_group == "7")]))
-   occupation_code_2020  [ i, 9] <- c(sum(CBOP_2020$poz_lWolnychMiejsc[which(datesOf2020[i] %within% interval(CBOP_2020$poz_dataUdostepnieniaOferty,CBOP_2020$poz_ofertaWaznaDo) & CBOP_2020$occupational_group == "8")]))
-   
-    occupation_code_2020  [ i, 10] <- c(sum(CBOP_2020$poz_lWolnychMiejsc[which(datesOf2020[i] %within% interval(CBOP_2020$poz_dataUdostepnieniaOferty,CBOP_2020$poz_ofertaWaznaDo) & CBOP_2020$occupational_group == "9")]))
-   occupation_code_2020  [ i, 11] <- c(sum(CBOP_2020$poz_lWolnychMiejsc[which(datesOf2020[i] %within% interval(CBOP_2020$poz_dataUdostepnieniaOferty,CBOP_2020$poz_ofertaWaznaDo) & CBOP_2020$occupational_group == "0")]))
-}
-
-occupation_code_2020
-
-occupation_code_2020 <-melt(occupation_code_2020, id.vars="dates")
-
-
-
-
-ggplot(occupation_code_2020, aes(dates,value)) + 
-  geom_point() + 
-  stat_smooth() +
-  facet_wrap(~variable)
-
-ggplot(data = occupation_code_2020) +
-  geom_bar(aes(x =dates, y = value), stat='identity') +
-  theme_bw()+facet_wrap(~variable)
-
-
-```
-
-
-
-```{r}
-#Demand for specific job groups in 2021
-
-occupation_code_2021 <-  data.frame(dates= datesOf2021,group1= c(1:365),group2= c(1:365),group3= c(1:365),group4= c(1:365),group5= c(1:365),group6= c(1:365),group7= c(1:365), group8= c(1:365), group9= c(1:365), group0= c(1:365))
-
-
-for (i in 1:365) {
-   occupation_code_2021  [ i, 2] <- c(sum(CBOP_2021$poz_lWolnychMiejsc[which(datesOf2021[i] %within% interval(CBOP_2021$poz_dataUdostepnieniaOferty,CBOP_2021$poz_ofertaWaznaDo) & CBOP_2021$occupational_group == "1")]))
-   
-    occupation_code_2021  [ i, 3] <- c(sum(CBOP_2021$poz_lWolnychMiejsc[which(datesOf2021[i] %within% interval(CBOP_2021$poz_dataUdostepnieniaOferty,CBOP_2021$poz_ofertaWaznaDo) & CBOP_2021$occupational_group == "2")]))
-
- occupation_code_2021  [ i, 4] <- c(sum(CBOP_2021$poz_lWolnychMiejsc[which(datesOf2021[i] %within% interval(CBOP_2021$poz_dataUdostepnieniaOferty,CBOP_2021$poz_ofertaWaznaDo) & CBOP_2021$occupational_group == "3")]))
- 
- occupation_code_2021  [ i, 5] <- c(sum(CBOP_2021$poz_lWolnychMiejsc[which(datesOf2021[i] %within% interval(CBOP_2021$poz_dataUdostepnieniaOferty,CBOP_2021$poz_ofertaWaznaDo) & CBOP_2021$occupational_group == "4")]))
-
- occupation_code_2021  [ i, 6] <- c(sum(CBOP_2021$poz_lWolnychMiejsc[which(datesOf2021[i] %within% interval(CBOP_2021$poz_dataUdostepnieniaOferty,CBOP_2021$poz_ofertaWaznaDo) & CBOP_2021$occupational_group == "5")]))
- occupation_code_2021  [ i, 7] <- c(sum(CBOP_2021$poz_lWolnychMiejsc[which(datesOf2021[i] %within% interval(CBOP_2021$poz_dataUdostepnieniaOferty,CBOP_2021$poz_ofertaWaznaDo) & CBOP_2021$occupational_group == "6")]))
-
- occupation_code_2021  [ i, 8] <- c(sum(CBOP_2021$poz_lWolnychMiejsc[which(datesOf2021[i] %within% interval(CBOP_2021$poz_dataUdostepnieniaOferty,CBOP_2021$poz_ofertaWaznaDo) & CBOP_2021$occupational_group == "7")]))
-                                    
- occupation_code_2021  [ i, 9] <- c(sum(CBOP_2021$poz_lWolnychMiejsc[which(datesOf2021[i] %within% interval(CBOP_2021$poz_dataUdostepnieniaOferty,CBOP_2021$poz_ofertaWaznaDo) & CBOP_2021$occupational_group == "8")]))
-
- occupation_code_2021  [ i, 10] <- c(sum(CBOP_2021$poz_lWolnychMiejsc[which(datesOf2021[i] %within% interval(CBOP_2021$poz_dataUdostepnieniaOferty,CBOP_2021$poz_ofertaWaznaDo) & CBOP_2021$occupational_group == "9")]))
-
- occupation_code_2021  [ i, 11] <- c(sum(CBOP_2021$poz_lWolnychMiejsc[which(datesOf2021[i] %within% interval(CBOP_2021$poz_dataUdostepnieniaOferty,CBOP_2021$poz_ofertaWaznaDo) & CBOP_2021$occupational_group == "0")]))
-
-}
-
-
-occupation_code_2021 <-melt(occupation_code_2021, id.vars="dates")
-
-
-
-
-ggplot(occupation_code_2021, aes(dates,value)) + 
-  geom_point() + 
-  stat_smooth() +
-  facet_wrap(~variable)
-
-ggplot(data = occupation_code_2021) +
-  geom_bar(aes(x =dates, y = value), stat='identity') +
-  theme_bw()+facet_wrap(~variable)
-
-```
-
-
-
-
-```{r}
-#Demand for specific job groups in 2022
-
-occupation_code_2022 <-  data.frame(dates= datesOf2022,group1= c(1:365),group2= c(1:365),group3= c(1:365),group4= c(1:365),group5= c(1:365),group6= c(1:365),group7= c(1:365), group8= c(1:365), group9= c(1:365), group0= c(1:365))
-
-
-for (i in 1:365) {
-   occupation_code_2022  [ i, 2] <- c(sum(CBOP_2022$poz_lWolnychMiejsc[which(datesOf2022[i] %within% interval(CBOP_2022$poz_dataUdostepnieniaOferty,CBOP_2022$poz_ofertaWaznaDo) & CBOP_2022$occupational_group == "1")]))
-   
-    occupation_code_2022  [ i, 3] <- c(sum(CBOP_2022$poz_lWolnychMiejsc[which(datesOf2022[i] %within% interval(CBOP_2022$poz_dataUdostepnieniaOferty,CBOP_2022$poz_ofertaWaznaDo) & CBOP_2022$occupational_group == "2")]))
-   
-    occupation_code_2022  [ i, 4] <- c(sum(CBOP_2022$poz_lWolnychMiejsc[which(datesOf2022[i] %within% interval(CBOP_2022$poz_dataUdostepnieniaOferty,CBOP_2022$poz_ofertaWaznaDo) & CBOP_2022$occupational_group == "3")]))
-   
-    occupation_code_2022  [ i, 5] <- c(sum(CBOP_2022$poz_lWolnychMiejsc[which(datesOf2022[i] %within% interval(CBOP_2022$poz_dataUdostepnieniaOferty,CBOP_2022$poz_ofertaWaznaDo) & CBOP_2022$occupational_group == "4")]))
-    
-   occupation_code_2022  [ i, 6] <- c(sum(CBOP_2022$poz_lWolnychMiejsc[which(datesOf2022[i] %within% interval(CBOP_2022$poz_dataUdostepnieniaOferty,CBOP_2022$poz_ofertaWaznaDo) & CBOP_2022$occupational_group == "5")]))
-   
-    occupation_code_2022  [ i, 7] <- c(sum(CBOP_2022$poz_lWolnychMiejsc[which(datesOf2022[i] %within% interval(CBOP_2022$poz_dataUdostepnieniaOferty,CBOP_2022$poz_ofertaWaznaDo) & CBOP_2022$occupational_group == "6")]))
-   
-    occupation_code_2022  [ i, 8] <- c(sum(CBOP_2022$poz_lWolnychMiejsc[which(datesOf2022[i] %within% interval(CBOP_2022$poz_dataUdostepnieniaOferty,CBOP_2022$poz_ofertaWaznaDo) & CBOP_2022$occupational_group == "7")]))
-   
-    occupation_code_2022  [ i, 9] <- c(sum(CBOP_2022$poz_lWolnychMiejsc[which(datesOf2022[i] %within% interval(CBOP_2022$poz_dataUdostepnieniaOferty,CBOP_2022$poz_ofertaWaznaDo) & CBOP_2022$occupational_group == "8")]))
-   
-   
-    occupation_code_2022  [ i, 10] <- c(sum(CBOP_2022$poz_lWolnychMiejsc[which(datesOf2022[i] %within% interval(CBOP_2022$poz_dataUdostepnieniaOferty,CBOP_2022$poz_ofertaWaznaDo) & CBOP_2022$occupational_group == "9")]))
-   
-    occupation_code_2022  [ i, 11] <- c(sum(CBOP_2022$poz_lWolnychMiejsc[which(datesOf2022[i] %within% interval(CBOP_2022$poz_dataUdostepnieniaOferty,CBOP_2022$poz_ofertaWaznaDo) & CBOP_2022$occupational_group == "0")]))
-   
-}
-
-
-occupation_code_2022 <-melt(occupation_code_2022, id.vars="dates")
-
-
-
-
-ggplot(occupation_code_2022, aes(dates,value)) + 
-  geom_point() + 
-  stat_smooth() +
-  facet_wrap(~variable)
-
-ggplot(data = occupation_code_2022) +
-    geom_bar(aes(x =dates, y = value), stat='identity') +
-  theme_bw()+facet_wrap(~variable)
-
-```
-
-
-
-```{r}
-#Demand for individual occupational groups over the period 2020-2022
-
-occupation_code_all <-  data.frame(dates= datesOfAnalysis,group1= c(1:1095),group2= c(1:1095),group3= c(1:1095),group4= c(1:1095),group5= c(1:1095),group6= c(1:1095),group7= c(1:1095), group8= c(1:1095), group9= c(1:1095), group0= c(1:1095))
-
-
-for (i in 1:1095) {
-   occupation_code_all  [ i, 2] <- c(sum(CBOP_all$poz_lWolnychMiejsc[which(datesOfAnalysis[i] %within% interval(CBOP_all$poz_dataUdostepnieniaOferty,CBOP_all$poz_ofertaWaznaDo) & CBOP_all$occupational_group == "1")]))
-   
-   occupation_code_all  [ i, 3] <- c(sum(CBOP_all$poz_lWolnychMiejsc[which(datesOfAnalysis[i] %within% interval(CBOP_all$poz_dataUdostepnieniaOferty,CBOP_all$poz_ofertaWaznaDo) & CBOP_all$occupational_group == "2")]))
-   
-   occupation_code_all  [ i, 4] <- c(sum(CBOP_all$poz_lWolnychMiejsc[which(datesOfAnalysis[i] %within% interval(CBOP_all$poz_dataUdostepnieniaOferty,CBOP_all$poz_ofertaWaznaDo) & CBOP_all$occupational_group == "3")]))
-   
-   occupation_code_all  [ i, 5] <- c(sum(CBOP_all$poz_lWolnychMiejsc[which(datesOfAnalysis[i] %within% interval(CBOP_all$poz_dataUdostepnieniaOferty,CBOP_all$poz_ofertaWaznaDo) & CBOP_all$occupational_group == "4")]))
-   
-   occupation_code_all  [ i, 6] <- c(sum(CBOP_all$poz_lWolnychMiejsc[which(datesOfAnalysis[i] %within% interval(CBOP_all$poz_dataUdostepnieniaOferty,CBOP_all$poz_ofertaWaznaDo) & CBOP_all$occupational_group == "5")]))
-   
-   occupation_code_all  [ i, 7] <- c(sum(CBOP_all$poz_lWolnychMiejsc[which(datesOfAnalysis[i] %within% interval(CBOP_all$poz_dataUdostepnieniaOferty,CBOP_all$poz_ofertaWaznaDo) & CBOP_all$occupational_group == "6")]))
-   
-   occupation_code_all  [ i, 8] <- c(sum(CBOP_all$poz_lWolnychMiejsc[which(datesOfAnalysis[i] %within% interval(CBOP_all$poz_dataUdostepnieniaOferty,CBOP_all$poz_ofertaWaznaDo) & CBOP_all$occupational_group == "7")]))
-   
-   occupation_code_all  [ i, 9] <- c(sum(CBOP_all$poz_lWolnychMiejsc[which(datesOfAnalysis[i] %within% interval(CBOP_all$poz_dataUdostepnieniaOferty,CBOP_all$poz_ofertaWaznaDo) & CBOP_all$occupational_group == "8")]))
-   
-   occupation_code_all  [ i, 10] <- c(sum(CBOP_all$poz_lWolnychMiejsc[which(datesOfAnalysis[i] %within% interval(CBOP_all$poz_dataUdostepnieniaOferty,CBOP_all$poz_ofertaWaznaDo) & CBOP_all$occupational_group == "9")]))
-   
-   occupation_code_all  [ i, 11] <- c(sum(CBOP_all$poz_lWolnychMiejsc[which(datesOfAnalysis[i] %within% interval(CBOP_all$poz_dataUdostepnieniaOferty,CBOP_all$poz_ofertaWaznaDo) & CBOP_all$occupational_group == "0")]))
-   
-}
-
-occupation_code_all <-melt(occupation_code_all, id.vars="dates")
-
-
-
-
-
-
-ggplot(occupation_code_all, aes(dates,value)) + 
-  geom_point() + 
-  stat_smooth() +
-  facet_wrap
-
-
-
-ggplot(data = occupation_code_all) +
-  geom_bar(aes(x =dates, y = value), stat='identity') +
-  theme_bw()+facet_wrap(~variable)
-
-
-
-```
-
-
-
-
-```{r}
-
-
-#Vacancy through years group by kod_zawodu
-
-
-
-ggplot(occupation_code_all, aes(dates,value)) + 
-  geom_point() + 
-  stat_smooth() +
-  scale_x_date(date_breaks = "1 year",date_labels = "%Y")+
-  facet_wrap(~variable)
-
-ggplot(data = occupation_code_all) +
-  geom_bar(aes(x =dates, y = value), stat='identity') +
-  scale_x_date(date_breaks = "1 year",date_labels = "%Y")+
-  theme_bw()+facet_wrap(~variable)
-
-
-
-
-
-
-
-```
-
-
-
-```{r}
-#Number of bids in 2020-2022 by province
-
-
-occupancies_provinces <-data.frame(dates= datesOfAnalysis,dolnoslaskie= c(1:1095),lubelskie= c(1:1095),lubuskie= c(1:1095),malopolskie= c(1:1095),mazowieckie= c(1:1095),opolskie= c(1:1095),podkarpackie= c(1:1095), podlaskie= c(1:1095), pomorskie= c(1:1095), slaskie= c(1:1095), swietokorzyskie=c(1:1095), warminiskomazurskie=c(1:1095), wielkopolskie=c(1:1095),zachodniopomorskie=c(1:1095), lodzkie=c(1:1095))
-
-
-
-
-for (i in 1:1095) {
-   occupancies_provinces[ i, 2] <- c(sum(CBOP_all$poz_lWolnychMiejsc[which(datesOfAnalysis[i] %within% interval(CBOP_all$poz_dataUdostepnieniaOferty,CBOP_all$poz_ofertaWaznaDo) & CBOP_all$war_kodWojewodztwa == "02")]))
-
-   occupancies_provinces[ i, 3] <- c(sum(CBOP_all$poz_lWolnychMiejsc[which(datesOfAnalysis[i] %within% interval(CBOP_all$poz_dataUdostepnieniaOferty,CBOP_all$poz_ofertaWaznaDo) & CBOP_all$war_kodWojewodztwa == "06")]))
-   
-   occupancies_provinces[ i, 4] <- c(sum(CBOP_all$poz_lWolnychMiejsc[which(datesOfAnalysis[i] %within% interval(CBOP_all$poz_dataUdostepnieniaOferty,CBOP_all$poz_ofertaWaznaDo) & CBOP_all$war_kodWojewodztwa == "08")]))   
-   
-   occupancies_provinces[ i, 5] <- c(sum(CBOP_all$poz_lWolnychMiejsc[which(datesOfAnalysis[i] %within% interval(CBOP_all$poz_dataUdostepnieniaOferty,CBOP_all$poz_ofertaWaznaDo) & CBOP_all$war_kodWojewodztwa == "12")]))   
-   
-   occupancies_provinces[ i, 6] <- c(sum(CBOP_all$poz_lWolnychMiejsc[which(datesOfAnalysis[i] %within% interval(CBOP_all$poz_dataUdostepnieniaOferty,CBOP_all$poz_ofertaWaznaDo) & CBOP_all$war_kodWojewodztwa == "14")]))
-   
-   occupancies_provinces[ i, 7] <- c(sum(CBOP_all$poz_lWolnychMiejsc[which(datesOfAnalysis[i] %within% interval(CBOP_all$poz_dataUdostepnieniaOferty,CBOP_all$poz_ofertaWaznaDo) & CBOP_all$war_kodWojewodztwa == "16")]))   
-
-   
-   occupancies_provinces[ i, 8] <- c(sum(CBOP_all$poz_lWolnychMiejsc[which(datesOfAnalysis[i] %within% interval(CBOP_all$poz_dataUdostepnieniaOferty,CBOP_all$poz_ofertaWaznaDo) & CBOP_all$war_kodWojewodztwa == "18")]))   
-   
-   
-   occupancies_provinces[ i, 9] <- c(sum(CBOP_all$poz_lWolnychMiejsc[which(datesOfAnalysis[i] %within% interval(CBOP_all$poz_dataUdostepnieniaOferty,CBOP_all$poz_ofertaWaznaDo) & CBOP_all$war_kodWojewodztwa == "20")]))   
-   
-   
-   occupancies_provinces[ i, 10] <- c(sum(CBOP_all$poz_lWolnychMiejsc[which(datesOfAnalysis[i] %within% interval(CBOP_all$poz_dataUdostepnieniaOferty,CBOP_all$poz_ofertaWaznaDo) & CBOP_all$war_kodWojewodztwa == "22")]))   
-   
+#Demand for specific job groups - function
+n_job_group_plot <- function(CBOP_year, startDate, endDate) {
+  datesOfAnalysis <- seq(as.Date(startDate), as.Date(endDate), by = "day")
   
-   occupancies_provinces[ i, 11] <- c(sum(CBOP_all$poz_lWolnychMiejsc[which(datesOfAnalysis[i] %within% interval(CBOP_all$poz_dataUdostepnieniaOferty,CBOP_all$poz_ofertaWaznaDo) & CBOP_all$war_kodWojewodztwa == "24")]))   
-   
-
-   occupancies_provinces[ i, 12] <- c(sum(CBOP_all$poz_lWolnychMiejsc[which(datesOfAnalysis[i] %within% interval(CBOP_all$poz_dataUdostepnieniaOferty,CBOP_all$poz_ofertaWaznaDo) & CBOP_all$war_kodWojewodztwa == "26")]))   
-    
-    
-    
-   occupancies_provinces[ i, 13] <- c(sum(CBOP_all$poz_lWolnychMiejsc[which(datesOfAnalysis[i] %within% interval(CBOP_all$poz_dataUdostepnieniaOferty,CBOP_all$poz_ofertaWaznaDo) & CBOP_all$war_kodWojewodztwa == "28")]))
-   
-   
-   occupancies_provinces[ i, 14] <- c(sum(CBOP_all$poz_lWolnychMiejsc[which(datesOfAnalysis[i] %within% interval(CBOP_all$poz_dataUdostepnieniaOferty,CBOP_all$poz_ofertaWaznaDo) & CBOP_all$war_kodWojewodztwa == "30")]))
-   
-   
-   occupancies_provinces[ i, 15] <- c(sum(CBOP_all$poz_lWolnychMiejsc[which(datesOfAnalysis[i] %within% interval(CBOP_all$poz_dataUdostepnieniaOferty,CBOP_all$poz_ofertaWaznaDo) & CBOP_all$war_kodWojewodztwa == "10")]))
-   
+  occupation_code <-  data.frame(dates = datesOfAnalysis, group0 = 0, group1 = 0,
+                                 group2 = 0, group3 = 0, group4 = 0, group5 = 0,
+                                 group6 = 0, group7 = 0, group8 = 0, group9 = 0)
+  
+  for (i in 1:length(datesOfAnalysis)) {
+    for (k in 0:9) {
+      occupation_code[i, k+2] <- 
+        sum(CBOP_year$poz_lWolnychMiejsc[which(datesOfAnalysis[i] %within% interval(CBOP_year$poz_dataUdostepnieniaOferty, CBOP_year$poz_ofertaWaznaDo) & CBOP_year$poz_grupaZawodu == as.character(k))]) +
+        sum(CBOP_year$poz_lWolnychMiejscDlaNiepeln[which(datesOfAnalysis[i] %within% interval(CBOP_year$poz_dataUdostepnieniaOferty, CBOP_year$poz_ofertaWaznaDo) & CBOP_year$poz_grupaZawodu == as.character(k))])
     }
+  }
+  
+  occupation_code <- melt(occupation_code, id.vars = "dates")
 
-
-
-occupancies_provinces<-melt(occupancies_provinces, id.vars="dates")
-
-
-
-
-ggplot(occupancies_provinces, aes(dates,value)) + 
-  geom_point() + 
-  stat_smooth() +
-  facet_wrap
-
-
-
-ggplot(data = occupancies_provinces) +
-  geom_bar(aes(x =dates, y = value), stat='identity') +
-  theme_bw()+facet_wrap(~variable)
-
-
-
+  demand_jg_plot <- ggplot(data = occupation_code, aes(x = dates, y = value)) +
+    geom_bar(stat='identity', fill = 'darkolivegreen3') +
+    theme_bw() +
+    labs(title = paste0('Demand for specific job groups over the period ', 
+                        startDate, '-', endDate, ''), x = '', y = '') +
+    facet_wrap(~variable)
+ 
+ return(demand_jg_plot) 
+}
 ```
 
-
-
-
-
-
-
 ```{r}
+#Demand for specific job groups
+demand_jg_plot_all <- n_job_group_plot(CBOP_all, "2020/09/28", "2022/02/17")
+print(demand_jg_plot_all)
 
-#Popularity of employment contract types in 2020-2022
+demand_jg_plot_2020 <- n_job_group_plot(CBOP_2020, "2020/09/28", "2020/12/31")
+print(demand_jg_plot_2020)
 
+demand_jg_plot_2021 <- n_job_group_plot(CBOP_2021, "2021/01/01", "2021/12/31")
+print(demand_jg_plot_2021)
 
-contract_type_years <-data.frame(dates= datesOfAnalysis, u1= c(1:1095),u2= c(1:1095),u3= c(1:1095),u4= c(1:1095),u5= c(1:1095))
-
-colnames(contract_type_years) <- c('dates','Umowa o pracę na czas określony','Umowa o pracę na okres próbny', 'Umowa o pracę na czas nieokreślony', 'Umowa na czas wyk. określonej pracy','Umowa o pracę w zastępstwie' )
-
-
-for (i in 1:1095) {
-   contract_type_years[ i, 2] <- c(sum(CBOP_all$poz_lWolnychMiejsc[which(datesOfAnalysis[i] %within% interval(CBOP_all$poz_dataUdostepnieniaOferty,CBOP_all$poz_ofertaWaznaDo) & CBOP_all$war_kodRodzajuZatrudnienia == "RPs005|12")]))
-
-   contract_type_years[ i, 3] <- c(sum(CBOP_all$poz_lWolnychMiejsc[which(datesOfAnalysis[i] %within% interval(CBOP_all$poz_dataUdostepnieniaOferty,CBOP_all$poz_ofertaWaznaDo) & CBOP_all$war_kodRodzajuZatrudnienia == "RPs005|13")]))
-   
-   contract_type_years[ i, 4] <- c(sum(CBOP_all$poz_lWolnychMiejsc[which(datesOfAnalysis[i] %within% interval(CBOP_all$poz_dataUdostepnieniaOferty,CBOP_all$poz_ofertaWaznaDo) & CBOP_all$war_kodRodzajuZatrudnienia == "RPs005|11")]))   
-   
-   contract_type_years[ i, 5] <- c(sum(CBOP_all$poz_lWolnychMiejsc[which(datesOfAnalysis[i] %within% interval(CBOP_all$poz_dataUdostepnieniaOferty,CBOP_all$poz_ofertaWaznaDo) & CBOP_all$war_kodRodzajuZatrudnienia == "RPs005|18")]))   
-   
-   contract_type_years[ i, 6] <- c(sum(CBOP_all$poz_lWolnychMiejsc[which(datesOfAnalysis[i] %within% interval(CBOP_all$poz_dataUdostepnieniaOferty,CBOP_all$poz_ofertaWaznaDo) & CBOP_all$war_kodRodzajuZatrudnienia == "RPs005|22")]))
-   
-   
-}  
-
-
-
-contract_type_years<-melt(contract_type_years, id.vars="dates")
-
-
-ggplot(contract_type_years, aes(dates,value)) + 
-  geom_point() + 
-  stat_smooth() +
-  facet_wrap
-
-
-
-ggplot(data = contract_type_years) +
-  geom_bar(aes(x =dates, y = value), stat='identity') +
-  theme_bw()+facet_wrap(~variable)
-
-
-
-
-```
-
-
-
-
-
-```{r}
-
-#Number of bids offered for employment under "Umowy o pracę na czas określony"
-
-
-contract_type1_years <-data.frame(dates= datesOfAnalysis, u1= c(1:1095))
-
-
-
-for (i in 1:1095) {
-contract_type1_years[ i, 2] <- c(sum(CBOP_all$poz_lWolnychMiejsc[which(datesOfAnalysis[i] %within% interval(CBOP_all$poz_dataUdostepnieniaOferty,CBOP_all$poz_ofertaWaznaDo) & CBOP_all$war_kodRodzajuZatrudnienia == "RPs005|12")]))
-
-}  
-
-ggplot(data = contract_type1_years, 
-       aes(x = dates, y = u1)) +
-  geom_point()
-
+demand_jg_plot_2022 <- n_job_group_plot(CBOP_2022, "2022/01/01", "2022/02/17")
+print(demand_jg_plot_2022)
 
 ```
 
 ```{r}
-#Number of bids offered for employment under "Umowa o pracę na okres próbny"
+#Number of vacancies by province - function
+n_province <- function(CBOP_year, startDate, endDate) {
+  datesOfAnalysis <- seq(as.Date(startDate), as.Date(endDate), by = "day")
+  
+  occupancies_provinces <- data.frame(dates = datesOfAnalysis, 
+                                      dolnoslaskie = 0, kujawsko_pomorskie = 0,
+                                      lubelskie = 0, lubuskie = 0, lodzkie = 0,
+                                      malopolskie  = 0, mazowieckie = 0, 
+                                      opolskie = 0, podkarpackie = 0, podlaskie = 0,
+                                      pomorskie = 0, slaskie = 0, 
+                                      swietokorzyskie = 0, warminisko_mazurskie = 0,
+                                      wielkopolskie = 0, zachodniopomorskie = 0)
+  
+  for (i in 1:length(datesOfAnalysis)) {
+    for (k in 1:16) {
+      occupancies_provinces[i, k + 1] <-
+        sum(CBOP_year$poz_lWolnychMiejsc[which(datesOfAnalysis[i] %within% interval(CBOP_year$poz_dataUdostepnieniaOferty, CBOP_year$poz_ofertaWaznaDo) & CBOP_year$war_kodWojewodztwa == as.character(k*2))]) +
+        sum(CBOP_year$poz_lWolnychMiejscDlaNiepeln[which(datesOfAnalysis[i] %within% interval(CBOP_year$poz_dataUdostepnieniaOferty, CBOP_year$poz_ofertaWaznaDo) & CBOP_year$war_kodWojewodztwa == as.character(k*2))])
+    }
+  }
+  
+  occupancies_provinces <- melt(occupancies_provinces, id.vars="dates")
 
-
-
-contract_type2_years <-data.frame(dates= datesOfAnalysis, u2= c(1:1095))
-
-
-
-for (i in 1:1095) {
-contract_type2_years[ i, 2] <- c(sum(CBOP_all$poz_lWolnychMiejsc[which(datesOfAnalysis[i] %within% interval(CBOP_all$poz_dataUdostepnieniaOferty,CBOP_all$poz_ofertaWaznaDo) & CBOP_all$war_kodRodzajuZatrudnienia == "RPs005|13")]))
-
-}  
-
-
-
-ggplot(data = contract_type2_years, 
-       aes(x = dates, y = u2)) +
-  geom_point()
-
+  province_plot <- ggplot(data = occupancies_provinces, aes(x =dates, y = value)) +
+    geom_bar(stat='identity', fill = 'deeppink3') +
+    theme_bw() +
+    facet_wrap(~variable) +
+    labs(title = paste0('Number of vacancies by provinces over the period ',
+                        startDate, '-', endDate, ''), y = 'vacancy', x ='')
+  
+  return(province_plot)
+}
 ```
 
 ```{r}
-#Number of bids offered for employment under "Umowa o pracę na czas nieokreślony"
-
-
-contract_type3_years <-data.frame(dates= datesOfAnalysis, u3= c(1:1095))
-
-
-for (i in 1:1095) {
-   contract_type3_years[ i, 2] <- c(sum(CBOP_all$poz_lWolnychMiejsc[which(datesOfAnalysis[i] %within% interval(CBOP_all$poz_dataUdostepnieniaOferty,CBOP_all$poz_ofertaWaznaDo) & CBOP_all$war_kodRodzajuZatrudnienia == "RPs005|11")]))
-
-}  
-
-
-
-ggplot(data = contract_type3_years, 
-       aes(x = dates, y = u3)) +
-  geom_point()
-
+#Number of vacancies by province
+province_plot_all <- n_province(CBOP_all, "2020/09/28", "2022/02/17")
+print(province_plot_all)
 ```
 
 ```{r}
+#Number of vacancies offered for employees by contract type - function
+n_contract_plot <- function(CBOP_year, startDate, endDate, contracts) {
+  datesOfAnalysis <- seq(as.Date(startDate), as.Date(endDate), by = "day")
+  
+  contract_type_years <- data.frame(dates = datesOfAnalysis, vacancy = 0)
 
-#Number of bids offered for employment under  "Umowa na czas wyk. określonej pracy"
-contract_type4_years <-data.frame(dates= datesOfAnalysis, u4= c(1:1095))
-
-
-for (i in 1:1095) {
-   contract_type4_years[ i, 2] <- c(sum(CBOP_all$poz_lWolnychMiejsc[which(datesOfAnalysis[i] %within% interval(CBOP_all$poz_dataUdostepnieniaOferty,CBOP_all$poz_ofertaWaznaDo) & CBOP_all$war_kodRodzajuZatrudnienia == "RPs005|18")]))
-
+  for (i in 1:length(datesOfAnalysis)) {
+    contract_type_years[i, 2] <-
+      sum(CBOP_year$poz_lWolnychMiejsc[which(datesOfAnalysis[i] %within% interval(CBOP_year$poz_dataUdostepnieniaOferty, CBOP_year$poz_ofertaWaznaDo) & CBOP_year$war_kodRodzajuZatrudnienia == contracts[1, 2])]) +
+      sum(CBOP_year$poz_lWolnychMiejscDlaNiepeln[which(datesOfAnalysis[i] %within% interval(CBOP_year$poz_dataUdostepnieniaOferty, CBOP_year$poz_ofertaWaznaDo) & CBOP_year$war_kodRodzajuZatrudnienia == contracts[1, 2])])
 }  
 
-
-ggplot(data = contract_type4_years, 
-       aes(x = dates, y = u4)) +
-  geom_point()
+  contract_plot <- ggplot(data = contract_type_years, 
+         aes(x = dates, y = vacancy)) +
+    geom_bar(stat='identity', fill = 'darkred') +
+    labs(title = paste0('Number of vacancies under "', contracts[1, 1], 
+                        '" over the period ', startDate, '-', 
+                        endDate, ''), y = 'vacancy', x ='')
+    
+  return(contract_plot)
+}
 ```
-
 
 ```{r}
+#Number of vacancies offered for employees by every contracts type - function
+n_every_contracts_plot <- function(CBOP_year, startDate, endDate, contracts) {
+  datesOfAnalysis <- seq(as.Date(startDate), as.Date(endDate), by = "day")
 
+  contract_type_years <- data.frame(dates = datesOfAnalysis, u1 = 0, u2 = 0, u3 = 0,
+                                    u4 = 0, u5 = 0)
 
-#Number of bids offered for employment under "Umowa o pracę w zastępstwie"
-contract_type5_years <-data.frame(dates= datesOfAnalysis, u5= c(1:1095))
+  colnames(contract_type_years) <- append(c('dates'), contracts[,1])
 
+  for (k in 1:5) {
+    for (i in 1:length(datesOfAnalysis)) {
+     contract_type_years[i, k+1] <-
+       sum(CBOP_year$poz_lWolnychMiejsc[which(datesOfAnalysis[i] %within% interval(CBOP_year$poz_dataUdostepnieniaOferty, CBOP_year$poz_ofertaWaznaDo) & CBOP_year$war_kodRodzajuZatrudnienia == contracts[k, 2])]) + 
+       sum(CBOP_year$poz_lWolnychMiejscDlaNiepeln[which(datesOfAnalysis[i] %within% interval(CBOP_year$poz_dataUdostepnieniaOferty, CBOP_year$poz_ofertaWaznaDo) & CBOP_year$war_kodRodzajuZatrudnienia == contracts[k, 2])])
+    }
+  }
+  
+  contract_type_years <- melt(contract_type_years, id.vars="dates")
 
-for (i in 1:1095) {
-   contract_type5_years[ i, 2] <- c(sum(CBOP_all$poz_lWolnychMiejsc[which(datesOfAnalysis[i] %within% interval(CBOP_all$poz_dataUdostepnieniaOferty,CBOP_all$poz_ofertaWaznaDo) & CBOP_all$war_kodRodzajuZatrudnienia == "RPs005|22")]))
-
-}  
-
-
-
-ggplot(data = contract_type5_years, 
-       aes(x = dates, y = u5)) +
-  geom_point()
+  every_contracts_plot <- ggplot(data = contract_type_years, 
+                               aes(x = dates, y = value)) +
+    geom_bar(stat='identity', fill = 'darkorchid3') +
+    theme_bw() + 
+    facet_wrap(~variable) +
+    labs(title = paste0('Number of vacancies by contracts over the period ',
+                        startDate, '-', endDate, ''), y = '', x ='')
+  
+  return(every_contracts_plot)
+}
 ```
 
+```{r}
+#Number of vacancies offered for employees by contract type 
+contracts <- data.frame(
+  contract_type = c('Employment contract for a definite period', 'Employment contract for a trial period', 'Employment contract for an indefinite period', 'Contract for the time of performance of specific work', 'Substitute employment contract'), 
+  contract_code = c("RPs005|12", "RPs005|13", "RPs005|11", "RPs005|18", "RPs005|22"))
+
+for (k in 1:5) {
+  contract_plot <- n_contract_plot(CBOP_all, "2020/09/28", "2022/02/17",
+                                         contracts[k,])
+  print(contract_plot)
+}
+rm(k)
+
+every_contracts_plot_all <- n_every_contracts_plot(CBOP_all, "2020/09/28",
+                                                   "2022/02/17", contracts)
+print(every_contracts_plot_all)
+```
