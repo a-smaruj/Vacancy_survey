@@ -18,22 +18,29 @@ CBOP_2022 <- readRDS('data\\rds\\cbop_2022.rds')
 ```
 
 ```{r}
-#Number of vacancies per day - function
+#Number of vacancies per month - function
 n_vacancy_plot <- function(CBOP_year, startDate, endDate) {
-  datesOfAnalysis <- seq(as.Date(startDate), as.Date(endDate), by = "day")
+  months_analysis <- seq(ym(startDate), ym(endDate), by = "month")
+  months_interval <- interval(months_analysis, months_analysis + months(1) - days(1))
 
-  n_vacancy <- data.frame(date = datesOfAnalysis, vacancy = 0)
+  n_vacancy <- data.frame(date = months_interval, vacancy = 0)
   
-  for (i in 1:length(datesOfAnalysis)) {
+  for (i in 1:length(months_interval)) {
      n_vacancy[i, 2] <- 
-       sum(CBOP_year$poz_lWolnychMiejsc[which(datesOfAnalysis[i] %within% interval(CBOP_year$poz_dataUdostepnieniaOferty,CBOP_year$poz_ofertaWaznaDo))]) +
-       sum(CBOP_year$poz_lWolnychMiejscDlaNiepeln[which(datesOfAnalysis[i] %within% interval(CBOP_year$poz_dataUdostepnieniaOferty,CBOP_year$poz_ofertaWaznaDo))])
+       sum(CBOP_year$poz_lWolnychMiejsc[which(int_overlaps(
+         interval(CBOP_year$poz_dataUdostepnieniaOferty, CBOP_year$poz_ofertaWaznaDo),
+         months_interval[i]))]) +
+       sum(CBOP_year$poz_lWolnychMiejscDlaNiepeln[which(int_overlaps(
+         interval(CBOP_year$poz_dataUdostepnieniaOferty, CBOP_year$poz_ofertaWaznaDo),
+         months_interval[i]))])
   }
+  
+  n_vacancy[,1] <- format(months_analysis, format = "%Y/%m")
   
   n_plot <- ggplot(data = n_vacancy, aes(x = date, y = vacancy)) +
     geom_bar(stat = "identity", fill = "blue") +
-    labs(title = paste0('Number of vacancies per day over the period ',
-                        startDate, '-', endDate, ''),
+    labs(title = paste0('Number of vacancies per month over the period ',
+                        ym(startDate), ' and ', ym(endDate) + months(1) - days(1), ''),
          y = 'vacancy', x ='')
   
   return(n_plot)
@@ -42,16 +49,16 @@ n_vacancy_plot <- function(CBOP_year, startDate, endDate) {
 
 ```{r}
 #Number of vacancies per day
-n_vacancy_plot_all <- n_vacancy_plot(CBOP_all, "2020/09/28", "2022/02/17")
+n_vacancy_plot_all <- n_vacancy_plot(CBOP_all, "2020/10", "2022/01")
 print(n_vacancy_plot_all)
 
-n_vacancy_plot_2020 <- n_vacancy_plot(CBOP_2020, "2020/09/28", "2020/12/31")
+n_vacancy_plot_2020 <- n_vacancy_plot(CBOP_2020, "2020/10", "2020/12")
 print(n_vacancy_plot_2020)
 
-n_vacancy_plot_2021 <- n_vacancy_plot(CBOP_2021, "2021/01/01", "2021/12/31")
+n_vacancy_plot_2021 <- n_vacancy_plot(CBOP_2021, "2021/01", "2021/12")
 print(n_vacancy_plot_2021)
 
-n_vacancy_plot_2022 <- n_vacancy_plot(CBOP_2022, "2022/01/01", "2022/02/17")
+n_vacancy_plot_2022 <- n_vacancy_plot(CBOP_2022, "2022/01", "2022/02")
 print(n_vacancy_plot_2022)
 ```
 
@@ -73,27 +80,38 @@ print(n_vacancy_plot_2022)
 ```{r}
 #Demand for specific job groups - function
 n_job_group_plot <- function(CBOP_year, startDate, endDate) {
-  datesOfAnalysis <- seq(as.Date(startDate), as.Date(endDate), by = "day")
+  months_analysis <- seq(ym(startDate), ym(endDate), by = "month")   
+  months_interval <- interval(months_analysis, months_analysis + months(1) - days(1))
   
-  occupation_code <-  data.frame(dates = datesOfAnalysis, group0 = 0, group1 = 0,
+  occupation_code <-  data.frame(months = months_interval, group0 = 0, group1 = 0,
                                  group2 = 0, group3 = 0, group4 = 0, group5 = 0,
                                  group6 = 0, group7 = 0, group8 = 0, group9 = 0)
   
-  for (i in 1:length(datesOfAnalysis)) {
+  colnames(occupation_code) <- c('months', '0 Armed forces', '1 Public officials', 
+                              '2 Professionals', '3 Technicians', '4 Office workers', 
+                              '5 Service workers', '6 Farmers', '7 Craft workers',
+                              '8 Machine operators', '9 Simple work employees')
+  
+  for (i in 1:length(months_interval)) {
     for (k in 0:9) {
       occupation_code[i, k+2] <- 
-        sum(CBOP_year$poz_lWolnychMiejsc[which(datesOfAnalysis[i] %within% interval(CBOP_year$poz_dataUdostepnieniaOferty, CBOP_year$poz_ofertaWaznaDo) & CBOP_year$poz_grupaZawodu == as.character(k))]) +
-        sum(CBOP_year$poz_lWolnychMiejscDlaNiepeln[which(datesOfAnalysis[i] %within% interval(CBOP_year$poz_dataUdostepnieniaOferty, CBOP_year$poz_ofertaWaznaDo) & CBOP_year$poz_grupaZawodu == as.character(k))])
+        sum(CBOP_year$poz_lWolnychMiejsc[which(int_overlaps(
+          interval(CBOP_year$poz_dataUdostepnieniaOferty, CBOP_year$poz_ofertaWaznaDo),          months_interval[i]) & CBOP_year$poz_grupaZawodu == as.character(k))]) +
+        sum(CBOP_year$poz_lWolnychMiejscDlaNiepeln[which(int_overlaps(
+          interval(CBOP_year$poz_dataUdostepnieniaOferty, CBOP_year$poz_ofertaWaznaDo),          months_interval[i]) & CBOP_year$poz_grupaZawodu == as.character(k))])
     }
   }
   
-  occupation_code <- melt(occupation_code, id.vars = "dates")
+  occupation_code[,1] <- format(months_analysis, format = "%Y/%m")
+  
+  occupation_code <- melt(occupation_code, id.vars = "months")
 
-  demand_jg_plot <- ggplot(data = occupation_code, aes(x = dates, y = value)) +
+  demand_jg_plot <- ggplot(data = occupation_code, aes(x = months, y = value)) +
     geom_bar(stat='identity', fill = 'darkolivegreen3') +
     theme_bw() +
     labs(title = paste0('Demand for specific job groups over the period ', 
-                        startDate, '-', endDate, ''), x = '', y = '') +
+                        ym(startDate), ' and ', ym(endDate) + months(1) - days(1), ''), 
+         x = '', y = '') +
     facet_wrap(~variable)
  
  return(demand_jg_plot) 
@@ -102,16 +120,16 @@ n_job_group_plot <- function(CBOP_year, startDate, endDate) {
 
 ```{r}
 #Demand for specific job groups
-demand_jg_plot_all <- n_job_group_plot(CBOP_all, "2020/09/28", "2022/02/17")
+demand_jg_plot_all <- n_job_group_plot(CBOP_all, "2020/10", "2022/01")
 print(demand_jg_plot_all)
 
-demand_jg_plot_2020 <- n_job_group_plot(CBOP_2020, "2020/09/28", "2020/12/31")
+demand_jg_plot_2020 <- n_job_group_plot(CBOP_2020, "2020/10", "2020/12")
 print(demand_jg_plot_2020)
 
-demand_jg_plot_2021 <- n_job_group_plot(CBOP_2021, "2021/01/01", "2021/12/31")
+demand_jg_plot_2021 <- n_job_group_plot(CBOP_2021, "2021/01", "2021/12")
 print(demand_jg_plot_2021)
 
-demand_jg_plot_2022 <- n_job_group_plot(CBOP_2022, "2022/01/01", "2022/02/17")
+demand_jg_plot_2022 <- n_job_group_plot(CBOP_2022, "2022/01", "2022/02")
 print(demand_jg_plot_2022)
 
 ```
@@ -119,9 +137,10 @@ print(demand_jg_plot_2022)
 ```{r}
 #Number of vacancies by province - function
 n_province <- function(CBOP_year, startDate, endDate) {
-  datesOfAnalysis <- seq(as.Date(startDate), as.Date(endDate), by = "day")
+  months_analysis <- seq(ym(startDate), ym(endDate), by = "month")   
+  months_interval <- interval(months_analysis, months_analysis + months(1) - days(1))
   
-  occupancies_provinces <- data.frame(dates = datesOfAnalysis, 
+  occupancies_provinces <- data.frame(months = months_interval, 
                                       dolnoslaskie = 0, kujawsko_pomorskie = 0,
                                       lubelskie = 0, lubuskie = 0, lodzkie = 0,
                                       malopolskie  = 0, mazowieckie = 0, 
@@ -130,22 +149,26 @@ n_province <- function(CBOP_year, startDate, endDate) {
                                       swietokorzyskie = 0, warminisko_mazurskie = 0,
                                       wielkopolskie = 0, zachodniopomorskie = 0)
   
-  for (i in 1:length(datesOfAnalysis)) {
+  for (i in 1:length(months_interval)) {
     for (k in 1:16) {
       occupancies_provinces[i, k + 1] <-
-        sum(CBOP_year$poz_lWolnychMiejsc[which(datesOfAnalysis[i] %within% interval(CBOP_year$poz_dataUdostepnieniaOferty, CBOP_year$poz_ofertaWaznaDo) & CBOP_year$war_kodWojewodztwa == as.character(k*2))]) +
-        sum(CBOP_year$poz_lWolnychMiejscDlaNiepeln[which(datesOfAnalysis[i] %within% interval(CBOP_year$poz_dataUdostepnieniaOferty, CBOP_year$poz_ofertaWaznaDo) & CBOP_year$war_kodWojewodztwa == as.character(k*2))])
+        sum(CBOP_year$poz_lWolnychMiejsc[which(int_overlaps( 
+          interval(CBOP_year$poz_dataUdostepnieniaOferty, CBOP_year$poz_ofertaWaznaDo),          months_interval[i]) & CBOP_year$war_kodWojewodztwa == as.character(k*2))]) +
+        sum(CBOP_year$poz_lWolnychMiejscDlaNiepeln[which(int_overlaps(
+          interval(CBOP_year$poz_dataUdostepnieniaOferty, CBOP_year$poz_ofertaWaznaDo),          months_interval[i]) & CBOP_year$war_kodWojewodztwa == as.character(k*2))])
     }
   }
   
-  occupancies_provinces <- melt(occupancies_provinces, id.vars="dates")
+  occupancies_provinces[,1] <- format(months_analysis, format = "%Y/%m")
+  occupancies_provinces <- melt(occupancies_provinces, id.vars = "months")
 
-  province_plot <- ggplot(data = occupancies_provinces, aes(x =dates, y = value)) +
+  province_plot <- ggplot(data = occupancies_provinces, aes(x = months, y = value)) +
     geom_bar(stat='identity', fill = 'deeppink3') +
     theme_bw() +
     facet_wrap(~variable) +
     labs(title = paste0('Number of vacancies by provinces over the period ',
-                        startDate, '-', endDate, ''), y = 'vacancy', x ='')
+                        ym(startDate), ' and ', ym(endDate) + months(1) - days(1), ''), 
+         y = 'vacancy', x ='')
   
   return(province_plot)
 }
@@ -153,29 +176,35 @@ n_province <- function(CBOP_year, startDate, endDate) {
 
 ```{r}
 #Number of vacancies by province
-province_plot_all <- n_province(CBOP_all, "2020/09/28", "2022/02/17")
+province_plot_all <- n_province(CBOP_all, "2020/10", "2022/01")
 print(province_plot_all)
 ```
 
 ```{r}
 #Number of vacancies offered for employees by contract type - function
 n_contract_plot <- function(CBOP_year, startDate, endDate, contracts) {
-  datesOfAnalysis <- seq(as.Date(startDate), as.Date(endDate), by = "day")
+  months_analysis <- seq(ym(startDate), ym(endDate), by = "month")   
+  months_interval <- interval(months_analysis, months_analysis + months(1) - days(1))
   
-  contract_type_years <- data.frame(dates = datesOfAnalysis, vacancy = 0)
+  contract_type_years <- data.frame(months = months_interval, vacancy = 0)
 
-  for (i in 1:length(datesOfAnalysis)) {
+  for (i in 1:length(months_interval)) {
     contract_type_years[i, 2] <-
-      sum(CBOP_year$poz_lWolnychMiejsc[which(datesOfAnalysis[i] %within% interval(CBOP_year$poz_dataUdostepnieniaOferty, CBOP_year$poz_ofertaWaznaDo) & CBOP_year$war_kodRodzajuZatrudnienia == contracts[1, 2])]) +
-      sum(CBOP_year$poz_lWolnychMiejscDlaNiepeln[which(datesOfAnalysis[i] %within% interval(CBOP_year$poz_dataUdostepnieniaOferty, CBOP_year$poz_ofertaWaznaDo) & CBOP_year$war_kodRodzajuZatrudnienia == contracts[1, 2])])
-}  
+      sum(CBOP_year$poz_lWolnychMiejsc[which(int_overlaps(  
+        interval(CBOP_year$poz_dataUdostepnieniaOferty, CBOP_year$poz_ofertaWaznaDo),          months_interval[i]) & CBOP_year$war_kodRodzajuZatrudnienia == contracts[1, 2])]) +
+      sum(CBOP_year$poz_lWolnychMiejscDlaNiepeln[which(int_overlaps(    
+        interval(CBOP_year$poz_dataUdostepnieniaOferty, CBOP_year$poz_ofertaWaznaDo),          months_interval[i]) & CBOP_year$war_kodRodzajuZatrudnienia == contracts[1, 2])])
+  }  
+  
+  contract_type_years[,1] <- format(months_analysis, format = "%Y/%m")
 
   contract_plot <- ggplot(data = contract_type_years, 
-         aes(x = dates, y = vacancy)) +
+         aes(x = months, y = vacancy)) +
     geom_bar(stat='identity', fill = 'darkred') +
     labs(title = paste0('Number of vacancies under "', contracts[1, 1], 
-                        '" over the period ', startDate, '-', 
-                        endDate, ''), y = 'vacancy', x ='')
+                        '" over the period ', ym(startDate), ' and ', 
+                        ym(endDate) + months(1) - days(1), ''),
+         y = 'vacancy', x ='')
     
   return(contract_plot)
 }
@@ -184,30 +213,35 @@ n_contract_plot <- function(CBOP_year, startDate, endDate, contracts) {
 ```{r}
 #Number of vacancies offered for employees by every contracts type - function
 n_every_contracts_plot <- function(CBOP_year, startDate, endDate, contracts) {
-  datesOfAnalysis <- seq(as.Date(startDate), as.Date(endDate), by = "day")
+  months_analysis <- seq(ym(startDate), ym(endDate), by = "month")   
+  months_interval <- interval(months_analysis, months_analysis + months(1) - days(1))
 
-  contract_type_years <- data.frame(dates = datesOfAnalysis, u1 = 0, u2 = 0, u3 = 0,
+  contract_type_years <- data.frame(months = months_interval, u1 = 0, u2 = 0, u3 = 0,
                                     u4 = 0, u5 = 0)
 
-  colnames(contract_type_years) <- append(c('dates'), contracts[,1])
+  colnames(contract_type_years) <- append(c('months'), contracts[,1])
 
   for (k in 1:5) {
-    for (i in 1:length(datesOfAnalysis)) {
+    for (i in 1:length(months_interval)) {
      contract_type_years[i, k+1] <-
-       sum(CBOP_year$poz_lWolnychMiejsc[which(datesOfAnalysis[i] %within% interval(CBOP_year$poz_dataUdostepnieniaOferty, CBOP_year$poz_ofertaWaznaDo) & CBOP_year$war_kodRodzajuZatrudnienia == contracts[k, 2])]) + 
-       sum(CBOP_year$poz_lWolnychMiejscDlaNiepeln[which(datesOfAnalysis[i] %within% interval(CBOP_year$poz_dataUdostepnieniaOferty, CBOP_year$poz_ofertaWaznaDo) & CBOP_year$war_kodRodzajuZatrudnienia == contracts[k, 2])])
+       sum(CBOP_year$poz_lWolnychMiejsc[which(int_overlaps(   
+         interval(CBOP_year$poz_dataUdostepnieniaOferty, CBOP_year$poz_ofertaWaznaDo),          months_interval[i]) & CBOP_year$war_kodRodzajuZatrudnienia == contracts[k, 2])]) +
+       sum(CBOP_year$poz_lWolnychMiejscDlaNiepeln[which(int_overlaps(         
+         interval(CBOP_year$poz_dataUdostepnieniaOferty, CBOP_year$poz_ofertaWaznaDo),          months_interval[i]) & CBOP_year$war_kodRodzajuZatrudnienia == contracts[k, 2])])
     }
   }
   
-  contract_type_years <- melt(contract_type_years, id.vars="dates")
+  contract_type_years[,1] <- format(months_analysis, format = "%Y/%m")
+  contract_type_years <- melt(contract_type_years, id.vars="months")
 
   every_contracts_plot <- ggplot(data = contract_type_years, 
-                               aes(x = dates, y = value)) +
+                               aes(x = months, y = value)) +
     geom_bar(stat='identity', fill = 'darkorchid3') +
     theme_bw() + 
     facet_wrap(~variable) +
     labs(title = paste0('Number of vacancies by contracts over the period ',
-                        startDate, '-', endDate, ''), y = '', x ='')
+                        ym(startDate), ' and ', ym(endDate) + months(1) - days(1), ''),
+         y = '', x ='')
   
   return(every_contracts_plot)
 }
@@ -220,13 +254,13 @@ contracts <- data.frame(
   contract_code = c("RPs005|12", "RPs005|13", "RPs005|11", "RPs005|18", "RPs005|22"))
 
 for (k in 1:5) {
-  contract_plot <- n_contract_plot(CBOP_all, "2020/09/28", "2022/02/17",
+  contract_plot <- n_contract_plot(CBOP_all, "2020/10", "2022/01",
                                          contracts[k,])
   print(contract_plot)
 }
 rm(k)
 
-every_contracts_plot_all <- n_every_contracts_plot(CBOP_all, "2020/09/28",
-                                                   "2022/02/17", contracts)
+every_contracts_plot_all <- n_every_contracts_plot(CBOP_all, "2020/10",
+                                                   "2022/01", contracts)
 print(every_contracts_plot_all)
 ```

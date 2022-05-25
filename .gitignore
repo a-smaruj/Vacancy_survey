@@ -5,3 +5,5 @@
 *.xlsx
 CBOP_2020-22_survey/data
 */.RDataTmp*
+*.pdf
+*.rds
