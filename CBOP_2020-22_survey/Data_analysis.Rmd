@@ -7,6 +7,7 @@ output: html_notebook
 library(tidyverse)
 library(lubridate)
 library(reshape2)
+library(data.table)
 ```
 
 ```{r}
@@ -15,6 +16,58 @@ CBOP_all <- readRDS('data\\rds\\cbop_all.rds')
 CBOP_2020 <- readRDS('data\\rds\\cbop_2020.rds')
 CBOP_2021 <- readRDS('data\\rds\\cbop_2021.rds')
 CBOP_2022 <- readRDS('data\\rds\\cbop_2022.rds')
+regon_data <- readRDS('data\\rds\\regon_data.rds')
+model <- readRDS('data\\rds\\model.rds')
+```
+
+```{r}
+#Prepare table with regon
+colnames(regon_data)[2] <- "prac_regon"
+regon_data[, prac_regon := substr(prac_regon, 1, 9)]
+regon_data <- regon_data %>% filter(duplicated(regon_data$prac_regon, 
+                                       fromLast = TRUE) == FALSE)
+```
+
+```{r}
+#Function to prepare data for further analysis (connect with information about employer)
+prepare_data <- function(CBOP_year) {
+  CBOP_year <- merge(x = CBOP_year, y = regon_data, by = "prac_regon", all.x = TRUE)
+  
+  CBOP_year <- CBOP_year %>% 
+  mutate(czas_dostepnosci = poz_ofertaWaznaDo - poz_dataPrzyjZglosz,
+         czas_dostepnosci_przedzial = case_when(
+                                        czas_dostepnosci < 25 ~ "<25",
+                                        czas_dostepnosci < 50 ~ "<25; 50)",
+                                        czas_dostepnosci < 75 ~ "<50; 75)",
+                                        czas_dostepnosci < 100 ~ "<75; 100)",
+                                        TRUE ~ ">100"))
+
+  CBOP_year <- CBOP_year %>% 
+    filter(!is.na(poz_grupaZawodu) & !is.na(poz_lWolnychMiejsc) & 
+             !is.na(war_wojewodztwo) & !is.na(czas_dostepnosci_przedzial) & 
+             !is.na(klasa) & !is.na(sek) & poz_grupaZawodu != '6') 
+  
+  probability <- predict(model, CBOP_year, type = 'response')
+  CBOP_year <- cbind(CBOP_year, probability)
+  CBOP_year$predict_vacancy <- CBOP_year$poz_lWolnychMiejsc * CBOP_year$probability
+  
+  return(CBOP_year)
+}
+```
+
+```{r}
+#TODO - prepare table with correct data
+CBOP_2020 <- prepare_data(CBOP_2020)
+CBOP_2021 <- prepare_data(CBOP_2021)
+CBOP_2022 <- prepare_data(CBOP_2022)
+CBOP_all <- prepare_data(CBOP_all)
+```
+
+```{r}
+#Number of not covered job offer after conncected to regon_data
+n_not_cover_2020 <- CBOP_2020 %>% filter(is.na(klasa)) %>% count() # 6 680
+n_not_cover_2021 <- CBOP_2021 %>% filter(is.na(klasa)) %>% count() #32 769
+n_not_cover_2022 <- CBOP_2022 %>% filter(is.na(klasa)) %>% count() #6 171
 ```
 
 ```{r}
@@ -24,13 +77,10 @@ n_vacancy_plot <- function(CBOP_year, startDate, endDate) {
   months_interval <- interval(months_analysis, months_analysis + months(1) - days(1))
 
   n_vacancy <- data.frame(date = months_interval, vacancy = 0)
-  
+
   for (i in 1:length(months_interval)) {
      n_vacancy[i, 2] <- 
        sum(CBOP_year$poz_lWolnychMiejsc[which(int_overlaps(
-         interval(CBOP_year$poz_dataUdostepnieniaOferty, CBOP_year$poz_ofertaWaznaDo),
-         months_interval[i]))]) +
-       sum(CBOP_year$poz_lWolnychMiejscDlaNiepeln[which(int_overlaps(
          interval(CBOP_year$poz_dataUdostepnieniaOferty, CBOP_year$poz_ofertaWaznaDo),
          months_interval[i]))])
   }
@@ -89,9 +139,8 @@ n_occup_group_plot <- function(CBOP_year, startDate, endDate) {
     for (k in 1:9) {
       occupation_code[i, k+1] <- 
         sum(CBOP_year$poz_lWolnychMiejsc[which(int_overlaps(
-          interval(CBOP_year$poz_dataUdostepnieniaOferty, CBOP_year$poz_ofertaWaznaDo),          months_interval[i]) & CBOP_year$poz_grupaZawodu == as.character(k))]) +
-        sum(CBOP_year$poz_lWolnychMiejscDlaNiepeln[which(int_overlaps(
-          interval(CBOP_year$poz_dataUdostepnieniaOferty, CBOP_year$poz_ofertaWaznaDo),          months_interval[i]) & CBOP_year$poz_grupaZawodu == as.character(k))])
+          interval(CBOP_year$poz_dataUdostepnieniaOferty, CBOP_year$poz_ofertaWaznaDo),           
+          months_interval[i]) & CBOP_year$poz_grupaZawodu == as.character(k))]) 
     }
   }
   
@@ -138,9 +187,8 @@ n_province <- function(CBOP_year, startDate, endDate) {
     for (k in 1:16) {
       occupancies_provinces[i, k + 1] <-
         sum(CBOP_year$poz_lWolnychMiejsc[which(int_overlaps( 
-          interval(CBOP_year$poz_dataUdostepnieniaOferty, CBOP_year$poz_ofertaWaznaDo),          months_interval[i]) & CBOP_year$war_kodWojewodztwa == as.character(k*2))]) +
-        sum(CBOP_year$poz_lWolnychMiejscDlaNiepeln[which(int_overlaps(
-          interval(CBOP_year$poz_dataUdostepnieniaOferty, CBOP_year$poz_ofertaWaznaDo),          months_interval[i]) & CBOP_year$war_kodWojewodztwa == as.character(k*2))])
+          interval(CBOP_year$poz_dataUdostepnieniaOferty, CBOP_year$poz_ofertaWaznaDo),          
+          months_interval[i]) & CBOP_year$war_kodWojewodztwa == as.character(k*2))])
     }
   }
   
@@ -185,9 +233,8 @@ print(province_plot_all)
 #   for (i in 1:length(months_interval)) {
 #     contract_type_years[i, 2] <-
 #       sum(CBOP_year$poz_lWolnychMiejsc[which(int_overlaps(  
-#         interval(CBOP_year$poz_dataUdostepnieniaOferty, CBOP_year$poz_ofertaWaznaDo),          months_interval[i]) & CBOP_year$war_kodRodzajuZatrudnienia == contracts[1, 2])]) +
-#       sum(CBOP_year$poz_lWolnychMiejscDlaNiepeln[which(int_overlaps(    
-#         interval(CBOP_year$poz_dataUdostepnieniaOferty, CBOP_year$poz_ofertaWaznaDo),          months_interval[i]) & CBOP_year$war_kodRodzajuZatrudnienia == contracts[1, 2])])
+#         interval(CBOP_year$poz_dataUdostepnieniaOferty, CBOP_year$poz_ofertaWaznaDo), 
+#           months_interval[i]) & CBOP_year$war_kodRodzajuZatrudnienia == contracts[1, 2])]) 
 #   }  
 #   
 #   contract_type_years[,1] <- format(months_analysis, format = "%Y/%m")
@@ -219,9 +266,8 @@ n_every_contracts_plot <- function(CBOP_year, startDate, endDate, contracts) {
     for (i in 1:length(months_interval)) {
      contract_type_years[i, k+1] <-
        sum(CBOP_year$poz_lWolnychMiejsc[which(int_overlaps(   
-         interval(CBOP_year$poz_dataUdostepnieniaOferty, CBOP_year$poz_ofertaWaznaDo),          months_interval[i]) & CBOP_year$war_kodRodzajuZatrudnienia == contracts[k, 2])]) +
-       sum(CBOP_year$poz_lWolnychMiejscDlaNiepeln[which(int_overlaps(         
-         interval(CBOP_year$poz_dataUdostepnieniaOferty, CBOP_year$poz_ofertaWaznaDo),          months_interval[i]) & CBOP_year$war_kodRodzajuZatrudnienia == contracts[k, 2])])
+         interval(CBOP_year$poz_dataUdostepnieniaOferty, CBOP_year$poz_ofertaWaznaDo),          
+         months_interval[i]) & CBOP_year$war_kodRodzajuZatrudnienia == contracts[k, 2])])
     }
   }
   
@@ -249,12 +295,13 @@ contracts <- data.frame(
   contract_type = c('Employment contract for a definite period', 'Employment contract for a trial period', 'Employment contract for an indefinite period', 'Contract for the time of performance of specific work', 'Substitute employment contract'), 
   contract_code = c("RPs005|12", "RPs005|13", "RPs005|11", "RPs005|18", "RPs005|22"))
 
-# for (k in 1:5) {
-#   contract_plot <- n_contract_plot(CBOP_all, "2020/10", "2022/01",
-#                                          contracts[k,])
-#   print(contract_plot)
-# }
-# rm(k)
+contract_plot <- list()
+for (k in 1:5) {
+  contract_plot[[k]] <- n_contract_plot(CBOP_all, "2020/10", "2022/01",
+                                          contracts[k,])
+  print(contract_plot[k])
+}
+rm(k)
 
 every_contracts_plot_all <- n_every_contracts_plot(CBOP_all, "2020/10",
                                                    "2022/01", contracts)

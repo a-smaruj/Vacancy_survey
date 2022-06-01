@@ -12,7 +12,7 @@ library(readxl)
 
 ```{r}
 # Read data
-Pracuj_phones <- read_xlsx('pracuj-proba-ang.xlsx', sheet=1)
+Pracuj_phones <- read_xlsx('data/pracuj-proba-ang.xlsx', sheet=1)
 ```
 
 ```{r}

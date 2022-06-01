@@ -217,6 +217,46 @@ pre code {
 <!-- rnb-text-begin -->
 <!-- rnb-text-end -->
 <!-- rnb-chunk-begin -->
+<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxubGlicmFyeShSY3BwU2ltZEpzb24pXG5saWJyYXJ5KGRhdGEudGFibGUpXG5gYGAifQ== -->
+<pre class="r"><code>library(RcppSimdJson)
+library(data.table)</code></pre>
+<!-- rnb-source-end -->
+<!-- rnb-output-begin eyJkYXRhIjoiZGF0YS50YWJsZSAxLjE0LjAgdXNpbmcgNCB0aHJlYWRzIChzZWUgP2dldERUdGhyZWFkcykuICBMYXRlc3QgbmV3czogci1kYXRhdGFibGUuY29tXG5cbkRvxYLEhWN6YW5pZSBwYWtpZXR1OiDigJhkYXRhLnRhYmxl4oCZXG5cbk5hc3TEmXB1asSFY2Ugb2JpZWt0eSB6b3N0YcWCeSB6YWtyeXRlIHog4oCYcGFja2FnZTpsdWJyaWRhdGXigJk6XG5cbiAgICBob3VyLCBpc293ZWVrLCBtZGF5LCBtaW51dGUsIG1vbnRoLCBxdWFydGVyLCBzZWNvbmQsIHdkYXksIHdlZWssIHlkYXksXG4gICAgeWVhclxuXG5OYXN0xJlwdWrEhWNlIG9iaWVrdHkgem9zdGHFgnkgemFrcnl0ZSB6IOKAmHBhY2thZ2U6ZHBseXLigJk6XG5cbiAgICBiZXR3ZWVuLCBmaXJzdCwgbGFzdFxuXG5OYXN0xJlwdWrEhWN5IG9iaWVrdCB6b3N0YcWCIHpha3J5dHkgeiDigJhwYWNrYWdlOnB1cnJy4oCZOlxuXG4gICAgdHJhbnNwb3NlXG4ifQ== -->
+<pre><code>data.table 1.14.0 using 4 threads (see ?getDTthreads).  Latest news: r-datatable.com
+
+Dołączanie pakietu: ‘data.table’
+
+Następujące obiekty zostały zakryte z ‘package:lubridate’:
+
+    hour, isoweek, mday, minute, month, quarter, second, wday, week, yday,
+    year
+
+Następujące obiekty zostały zakryte z ‘package:dplyr’:
+
+    between, first, last
+
+Następujący obiekt został zakryty z ‘package:purrr’:
+
+    transpose</code></pre>
+<!-- rnb-output-end -->
+<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxubGlicmFyeShcImx1YnJpZGF0ZVwiKVxubGlicmFyeSh0aWR5dmVyc2UpXG5saWJyYXJ5KHN0cmluZ2kpXG5saWJyYXJ5KHNjYWxlcylcbmBgYCJ9 -->
+<pre class="r"><code>library(&quot;lubridate&quot;)
+library(tidyverse)
+library(stringi)
+library(scales)</code></pre>
+<!-- rnb-source-end -->
+<!-- rnb-output-begin eyJkYXRhIjoiXG5Eb8WCxIVjemFuaWUgcGFraWV0dTog4oCYc2NhbGVz4oCZXG5cbk5hc3TEmXB1asSFY3kgb2JpZWt0IHpvc3RhxYIgemFrcnl0eSB6IOKAmHBhY2thZ2U6cHVycnLigJk6XG5cbiAgICBkaXNjYXJkXG5cbk5hc3TEmXB1asSFY3kgb2JpZWt0IHpvc3RhxYIgemFrcnl0eSB6IOKAmHBhY2thZ2U6cmVhZHLigJk6XG5cbiAgICBjb2xfZmFjdG9yXG4ifQ== -->
+<pre><code>
+Dołączanie pakietu: ‘scales’
+
+Następujący obiekt został zakryty z ‘package:purrr’:
+
+    discard
+
+Następujący obiekt został zakryty z ‘package:readr’:
+
+    col_factor</code></pre>
+<!-- rnb-output-end -->
 <!-- rnb-chunk-end -->
 <!-- rnb-text-begin -->
 <!-- rnb-text-end -->
@@ -299,7 +339,7 @@ columns_to_keep &lt;- c(&#39;file&#39;, &#39;hash&#39;, &#39;prac_osobaDoKontakt
 <!-- rnb-text-begin -->
 <!-- rnb-text-end -->
 <!-- rnb-chunk-begin -->
-<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxuY3JlYXRlX3RhYmxlIDwtIGZ1bmN0aW9uKGNib3BfeWVhciwgZmlsZXMpIHtcblxuICBmb3IgKGZpbGUgaW4gZmlsZXMpIHtcbiAgICBjYm9wX3llYXJbW2xlbmd0aChjYm9wX3llYXIpKzFdXSA8LSByZWFkX2Nib3AoZmlsZSlcbiAgfVxuICBcbiAgZmlsZXMgPC0gc3RyX3JlbW92ZV9hbGwoZmlsZXMsICcoZGF0YVxcXFxcXFxcXFxcXGQrXFxcXFxcXFx8X2Z1bGwuanNvbiknKVxuICBcbiAgbmFtZXMoY2JvcF95ZWFyKSA8LSBiYXNlbmFtZShmaWxlcylcbiAgY2JvcF95ZWFyIDwtIHJiaW5kbGlzdChjYm9wX3llYXIsIGlkY29sID0gXCJmaWxlXCIpXG4gIGNib3BfeWVhciRmaWxlIDwtIHltZChjYm9wX3llYXIkZmlsZSlcbiAgXG4gIGNib3BfeWVhciA8LSBjYm9wX3llYXJbLCAuLmNvbHVtbnNfdG9fa2VlcF1cblxuICByZXR1cm4oY2JvcF95ZWFyKVxufVxuYGBgIn0= -->
+<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxuY3JlYXRlX3RhYmxlIDwtIGZ1bmN0aW9uKGNib3BfeWVhciwgZmlsZXMpIHtcblxuICBmb3IgKGZpbGUgaW4gZmlsZXMpIHtcbiAgICBjYm9wX3llYXJbW2xlbmd0aChjYm9wX3llYXIpKzFdXSA8LSByZWFkX2Nib3AoZmlsZSlcbiAgfVxuICBcbiAgZmlsZXMgPC0gc3RyX3JlbW92ZV9hbGwoZmlsZXMsICcoZGF0YVxcXFxcXFxcXFxcXGQrXFxcXFxcXFx8X2Z1bGwuanNvbiknKVxuICBcbiAgbmFtZXMoY2JvcF95ZWFyKSA8LSBiYXNlbmFtZShmaWxlcylcbiAgY2JvcF95ZWFyIDwtIHJiaW5kbGlzdChjYm9wX3llYXIsIGlkY29sID0gXCJmaWxlXCIpXG4gIGNib3BfeWVhciRmaWxlIDwtIHltZChjYm9wX3llYXIkZmlsZSlcbiAgXG4gICNjYm9wX3llYXIgPC0gY2JvcF95ZWFyWywgLi5jb2x1bW5zX3RvX2tlZXBdXG5cbiAgcmV0dXJuKGNib3BfeWVhcilcbn1cbmBgYCJ9 -->
 <pre class="r"><code>create_table &lt;- function(cbop_year, files) {
 
   for (file in files) {
@@ -312,7 +352,7 @@ columns_to_keep &lt;- c(&#39;file&#39;, &#39;hash&#39;, &#39;prac_osobaDoKontakt
   cbop_year &lt;- rbindlist(cbop_year, idcol = &quot;file&quot;)
   cbop_year$file &lt;- ymd(cbop_year$file)
   
-  cbop_year &lt;- cbop_year[, ..columns_to_keep]
+  #cbop_year &lt;- cbop_year[, ..columns_to_keep]
 
   return(cbop_year)
 }</code></pre>

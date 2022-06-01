@@ -3,8 +3,7 @@
 .RData
 .Ruserdata
 *.xlsx
-CBOP_2020-22_survey/data
+*/data
 */.RDataTmp*
-*.pdf
 *.rds
-*/popyt-regony/
+*.pdf

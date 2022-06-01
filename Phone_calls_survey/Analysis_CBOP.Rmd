@@ -8,25 +8,28 @@ output: html_notebook
 library(tidyverse)
 library("lubridate")
 library(readxl)
+library(stringi)
 ```
 
 ```{r}
 # Read data
-CBOP_phones <- read_xlsx('proba-cbop-telefony-ang.xlsx', sheet=1)
+CBOP_phones <- read_xlsx('data/proba-cbop-telefony.xlsx', sheet=1)
 ```
 
 ```{r}
 # Changing for date
-CBOP_phones$invaildFrom <- ymd(CBOP_phones$invaildFrom)
-CBOP_phones$expirationDate <- ymd(CBOP_phones$expirationDate)
-CBOP_phones$conversationDate <- ymd(CBOP_phones$conversationDate)
+CBOP_phones$nieaktual_od <- ymd(CBOP_phones$nieaktual_od)
+CBOP_phones$data_wazna_do <- ymd(CBOP_phones$data_wazna_do)
+CBOP_phones$data_rozmowy <- ymd(CBOP_phones$data_rozmowy)
+CBOP_phones$data_rozpoczecia <- dmy(CBOP_phones$data_rozpoczecia)
+CBOP_phones$data_przyjecie <- ymd(CBOP_phones$data_przyjecie)
 
 # Changing for numeric
-CBOP_phones$currentlyVacant <- as.numeric(as.character(CBOP_phones$currentlyVacant))
-CBOP_phones$available <- as.numeric(as.character(CBOP_phones$available))
+CBOP_phones$aktual_wolne <- as.numeric(as.character(CBOP_phones$aktual_wolne))
+CBOP_phones$wolne <- as.numeric(as.character(CBOP_phones$wolne))
 
 # Changing to lower for consistency
-CBOP_phones$valid <- tolower(CBOP_phones$valid)
+CBOP_phones$czy_aktualna <- tolower(CBOP_phones$czy_aktualna)
 
 ```
 
@@ -34,126 +37,170 @@ CBOP_phones$valid <- tolower(CBOP_phones$valid)
 # The size of sample, answered calls, not anwered calls
 nrows <- nrow(CBOP_phones)
 
-answered <- CBOP_phones %>% filter(!is.na(conversationDate)) %>% count()
-not_answered <- CBOP_phones %>% filter(is.na(conversationDate)) %>% count()
+answered <- CBOP_phones %>% filter(!is.na(data_rozmowy)) %>% count()
+not_answered <- CBOP_phones %>% filter(is.na(data_rozmowy)) %>% count()
 ```
 
 ```{r}
 # Number of answered call where people cooperated and didn't cooperated
-answered_cooperation <- CBOP_phones %>% filter(!is.na(conversationDate), 
-                                             !is.na(valid)) %>% count() +
-  CBOP_phones %>% filter(!is.na(conversationDate), is.na(valid), 
-                         grepl('nie ma takiej oferty',notes) == TRUE) %>% count()
+answered_cooperation <- CBOP_phones %>% filter(!is.na(data_rozmowy), 
+                                             !is.na(czy_aktualna)) %>% count() +
+  CBOP_phones %>% filter(!is.na(data_rozmowy), is.na(czy_aktualna), 
+                         grepl('nie ma takiej oferty', notatki) == TRUE) %>% count()
 
-no_cooperation <- CBOP_phones %>% filter(grepl('brak współpracy',notes) == TRUE | 
-           grepl('brak informacji',notes) == TRUE) %>% count()
+no_cooperation <- CBOP_phones %>% filter(grepl('brak współpracy',notatki) == TRUE | 
+           grepl('brak informacji',notatki) == TRUE) %>% count()
 
 ```
 
 ```{r}
 #call date
-min_call_date <- min(CBOP_phones$conversationDate, na.rm = TRUE)
-max_call_date <- max(CBOP_phones$conversationDate, na.rm = TRUE)
-amount_days <- length(unique(na.omit(CBOP_phones$conversationDate)))
+min_call_date <- min(CBOP_phones$data_rozmowy, na.rm = TRUE)
+max_call_date <- max(CBOP_phones$data_rozmowy, na.rm = TRUE)
+amount_days <- length(unique(na.omit(CBOP_phones$data_rozmowy)))
 ```
 
 ```{r}
-# Quantity of valid and invalid jobs offer and not existing offers
+# Quantity of czy_aktualna and inczy_aktualna jobs offer and not existing offers
+not_exist_job_offer <- CBOP_phones %>% filter(!is.na(data_rozmowy), is.na(czy_aktualna), 
+                         grepl('nie ma takiej oferty',notatki) == TRUE) %>% count()
 
-not_exist_job_offer <- CBOP_phones %>% filter(!is.na(conversationDate), is.na(valid), 
-                         grepl('nie ma takiej oferty',notes) == TRUE) %>% count()
-
-valid_job_offer <- CBOP_phones %>% filter(valid == 'prawda') %>% count() +
-  CBOP_phones %>% filter(valid == 'fałsz') %>%
-  summarise(ile_do_wygas = expirationDate - invaildFrom, na.rm = TRUE) %>%
+czy_aktualna_job_offer <- CBOP_phones %>% filter(czy_aktualna == 'prawda') %>% count() +
+  CBOP_phones %>% filter(czy_aktualna == 'fałsz') %>%
+  summarise(ile_do_wygas = data_wazna_do - nieaktual_od, na.rm = TRUE) %>%
   filter((ile_do_wygas < 0)) %>% count()
 
-invalid_job_offer <- CBOP_phones %>% filter(valid == 'fałsz') %>%
-  summarise(ile_do_wygas = expirationDate - invaildFrom, na.rm = TRUE) %>%
+inczy_aktualna_job_offer <- CBOP_phones %>% filter(czy_aktualna == 'fałsz') %>%
+  summarise(ile_do_wygas = data_wazna_do - nieaktual_od, na.rm = TRUE) %>%
   filter(!(ile_do_wygas < 0)) %>% count() + 
-  CBOP_phones %>% filter(valid == 'fałsz', is.na(invaildFrom)) %>% count()
+  CBOP_phones %>% filter(czy_aktualna == 'fałsz', is.na(nieaktual_od)) %>% count()
 
 ```
 
 ```{r}
 # Median of call date - false_offer date
-median_time_invalid <- median(CBOP_phones$conversationDate - CBOP_phones$invaildFrom, 
+median_time_inczy_aktualna <- median(CBOP_phones$data_rozmowy - CBOP_phones$nieaktual_od,
                         na.rm = TRUE)
 ```
 
-
 ```{r}
 #Vacancies that do not match, match and no info about
-
 no_match_vacancies <- CBOP_phones %>% 
-  filter(valid == 'prawda' & available != currentlyVacant) %>% count()
+  filter(czy_aktualna == 'prawda' & wolne != aktual_wolne) %>% count()
 
 match_vacancies <- CBOP_phones %>% 
-  filter(valid == 'prawda' & available == currentlyVacant) %>% count()
+  filter(czy_aktualna == 'prawda' & wolne == aktual_wolne) %>% count()
 
 no_info_vacancies <- CBOP_phones %>% 
-  filter(valid == 'prawda' & is.na(currentlyVacant) == TRUE) %>% count() + 
-  CBOP_phones %>% filter(valid == 'fałsz') %>%
-  summarise(ile_do_wygas = expirationDate - invaildFrom, na.rm = TRUE) %>%
+  filter(czy_aktualna == 'prawda' & is.na(aktual_wolne) == TRUE) %>% count() + 
+  CBOP_phones %>% filter(czy_aktualna == 'fałsz') %>%
+  summarise(ile_do_wygas = data_wazna_do - nieaktual_od, na.rm = TRUE) %>%
   filter((ile_do_wygas < 0)) %>% count()
 ```
 
 ```{r}
 # Real vacancy and difference
-
-n_phone_vacancy <- sum(CBOP_phones$currentlyVacant, na.rm = TRUE)
-n_jo_vacancy <- sum(CBOP_phones$available, na.rm = TRUE)
+n_phone_vacancy <- sum(CBOP_phones$aktual_wolne, na.rm = TRUE)
+n_jo_vacancy <- sum(CBOP_phones$wolne, na.rm = TRUE)
 
 n_difference_vacancy <- n_jo_vacancy - n_phone_vacancy
 ```
 
 ```{r}
 #Estimation of the real number of vacancies
-
-CBOP_phones_est_vaca <- CBOP_phones %>% filter(valid == 'prawda') %>% 
-  mutate(n_vacancies = case_when(available == currentlyVacant ~ 'properly estimated', 
-                                 available < currentlyVacant ~ 'underestimated', 
-                                 available > currentlyVacant ~ 'overestimated',
+CBOP_phones_est_vaca <- CBOP_phones %>% filter(czy_aktualna == 'prawda') %>% 
+  mutate(n_vacancies = case_when(wolne == aktual_wolne ~ 'properly estimated',
+                                 wolne < aktual_wolne ~ 'underestimated', 
+                                 wolne > aktual_wolne ~ 'overestimated',
                                  TRUE ~ 'no information')) %>% 
-  group_by(n_vacancies) %>% count()
+  group_by(n_vacancies) %>% count(n_vacancies)
 
 CBOP_phones_est_vaca$n[which(CBOP_phones_est_vaca$n_vacancies == "no information")] <-
   CBOP_phones_est_vaca$n[which(CBOP_phones_est_vaca$n_vacancies == "no information")] + 
-  CBOP_phones %>% filter(valid == 'fałsz') %>%
-  summarise(ile_do_wygas = expirationDate - invaildFrom, na.rm = TRUE) %>%
-  filter((ile_do_wygas < 0)) %>% count()
+  (CBOP_phones %>% filter(czy_aktualna == 'fałsz') %>%
+  summarise(ile_do_wygas = data_wazna_do - nieaktual_od, na.rm = TRUE) %>%
+  filter((ile_do_wygas < 0)) %>% count())[[1]]
 
-#TODO, labels are not working properly
-ggplot(data = CBOP_phones_est_vaca, aes(x = n_vacancies, y = n)) +
-  geom_bar(stat = 'identity', fill = 'darksalmon', col = 'black') +
-  theme_bw() +
-  labs(x ='', y='') +
-  geom_text(aes(label = n), color = "black", size=4.5, 
-            position = position_stack(vjust = 1.05))
-
+my_plot_1 <- ggplot(data = CBOP_phones_est_vaca, aes(x = n_vacancies, y = n)) +
+                  geom_bar(stat = 'identity') +
+                  theme_bw() +
+                  labs(x ='', y='') +
+                  geom_text(aes(label = n), position = position_dodge(0.9),
+                    vjust = -0.3, size=4.5)
+my_plot_1
 ```
 
 ```{r}
 #'Number of offers depending on report of demand for vacancy' - table
-CBOP_demand_vacancy_current <- CBOP_phones %>% filter(valid == 'prawda' 
-                                              & !is.na(currentlyVacant)) %>%
-  group_by(currentlyVacant) %>% count()
+CBOP_demand_vacancy_current <- CBOP_phones %>% filter(czy_aktualna == 'prawda' 
+                                              & !is.na(aktual_wolne)) %>%
+  group_by(aktual_wolne) %>% count()
 
 CBOP_demand_vacancy_current <- CBOP_demand_vacancy_current %>%
-  rename('number_of_offers_current' = n, 'vacancies' = currentlyVacant)
+  rename('number_of_offers_current' = n, 'vacancies' = aktual_wolne)
 
-CBOP_demand_vacancy_website<- CBOP_phones %>% group_by(available) %>% count()
+CBOP_demand_vacancy_website<- CBOP_phones %>% group_by(wolne) %>% count()
 
 CBOP_demand_vacancy_website <- CBOP_demand_vacancy_website %>%
-  rename('number_of_offers_website' = n, 'vacancies' = available)
+  rename('number_of_offers_website' = n, 'vacancies' = wolne)
 
 CBOP_demand_vacancy <- merge(x=CBOP_demand_vacancy_website, 
                              y=CBOP_demand_vacancy_current, 
                              by="vacancies", all=TRUE)
 
 CBOP_demand_vacancy <- CBOP_demand_vacancy %>% mutate_all(~replace(., is.na(.), 0))
-
-ggplot(data = CBOP_demand_vacancy, aes(x = vacancies, y = number_of_offers_current)) +
-  geom_bar(stat = 'identity', fill = 'darksalmon', col = 'black') +
-  theme_bw()
 ```
+
+```{r}
+#Prepare data to create model
+CBOP_phones$war_wojewodztwo <- stri_trans_general(str_remove_all(CBOP_phones$miejsce,
+                                                          '.* woj: '), 'pl-ascii')
+names(CBOP_phones)[12] <- 'poz_lWolnychMiejsc'
+
+CBOP_phones <- CBOP_phones %>% 
+  mutate(valid_bolean = if_else(czy_aktualna == 'prawda', TRUE, 
+                                if_else(czy_aktualna == 'fałsz', FALSE, NA)),
+         poz_grupaZawodu = str_sub(zawod_kod, 1, 1),
+         czas_dostepnosci = data_wazna_do - data_przyjecie,
+         czas_dostepnosci_przedzial = case_when(
+                                        czas_dostepnosci < 25 ~ "<25",
+                                        czas_dostepnosci < 50 ~ "<25; 50)",
+                                        czas_dostepnosci < 75 ~ "<50; 75)",
+                                        czas_dostepnosci < 100 ~ "<75; 100)",
+                                        TRUE ~ ">100"))
+
+```
+
+```{r}
+#Connect with information about employer (regon table)
+regon_data <- readRDS("data/popyt-regony/operat-part.rds")
+regon_data <- regon_data %>% filter(duplicated(regon_data$regon, 
+                                       fromLast = TRUE) == FALSE)
+colnames(regon_data)[2] <- toupper(colnames(regon_data)[2])
+CBOP_phones <- merge(x = CBOP_phones, y = regon_data, by = "REGON", all.x = TRUE)
+
+CBOP_phones <- CBOP_phones %>%
+  filter(!is.na(valid_bolean) & !is.na(poz_grupaZawodu) & !is.na(poz_lWolnychMiejsc) &
+           !is.na(czas_dostepnosci_przedzial) & !is.na(war_wojewodztwo) & 
+           !is.na(klasa) & !is.na(sek)) 
+```
+
+```{r}
+#Create model
+model <- glm(formula = valid_bolean ~ poz_grupaZawodu + czas_dostepnosci_przedzial +
+               war_wojewodztwo + klasa + sek + log(poz_lWolnychMiejsc) ,
+             data = CBOP_phones,
+             family = binomial(),
+             subset = poz_grupaZawodu != '6')
+
+summary(model)
+
+car::Anova(model)
+```
+
+```{r}
+#save files
+saveRDS(regon_data, "regon_data.rds")
+saveRDS(model, "model.rds")
+```
+
