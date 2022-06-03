@@ -7,7 +7,6 @@ output: html_notebook
 library(tidyverse)
 library(lubridate)
 library(reshape2)
-library(data.table)
 ```
 
 ```{r}
@@ -23,15 +22,23 @@ model <- readRDS('data\\rds\\model.rds')
 ```{r}
 #Prepare table with regon
 colnames(regon_data)[2] <- "prac_regon"
-regon_data[, prac_regon := substr(prac_regon, 1, 9)]
+regon_data$prac_regon <- substr(regon_data$prac_regon, 1, 9)
 regon_data <- regon_data %>% filter(duplicated(regon_data$prac_regon, 
                                        fromLast = TRUE) == FALSE)
+
+
+#Table for stats with number of not covered data
+n_not_covered_data <- c()
 ```
 
 ```{r}
 #Function to prepare data for further analysis (connect with information about employer)
 prepare_data <- function(CBOP_year) {
+  
   CBOP_year <- merge(x = CBOP_year, y = regon_data, by = "prac_regon", all.x = TRUE)
+  
+  n_not_covered_data <<- append(n_not_covered_data, 
+                                (CBOP_year %>% filter(is.na(klasa)) %>% count())[[1]])
   
   CBOP_year <- CBOP_year %>% 
   mutate(czas_dostepnosci = poz_ofertaWaznaDo - poz_dataPrzyjZglosz,
@@ -56,7 +63,7 @@ prepare_data <- function(CBOP_year) {
 ```
 
 ```{r}
-#TODO - prepare table with correct data
+#Pepare data and apply model
 CBOP_2020 <- prepare_data(CBOP_2020)
 CBOP_2021 <- prepare_data(CBOP_2021)
 CBOP_2022 <- prepare_data(CBOP_2022)
@@ -64,37 +71,45 @@ CBOP_all <- prepare_data(CBOP_all)
 ```
 
 ```{r}
-#Number of not covered job offer after conncected to regon_data
-n_not_cover_2020 <- CBOP_2020 %>% filter(is.na(klasa)) %>% count() # 6 680
-n_not_cover_2021 <- CBOP_2021 %>% filter(is.na(klasa)) %>% count() #32 769
-n_not_cover_2022 <- CBOP_2022 %>% filter(is.na(klasa)) %>% count() #6 171
+#Table for stats with number of not covered data
+names(n_not_covered_data) <- c('2020', '2021', '2022', 'all')
+n_not_covered_data <- t(data.frame(n_not_covered_data))
 ```
 
 ```{r}
 #Number of vacancies per month - function
 n_vacancy_plot <- function(CBOP_year, startDate, endDate) {
-  months_analysis <- seq(ym(startDate), ym(endDate), by = "month")
+  months_analysis <- seq(ym(startDate), ym(endDate), by = 'month')
   months_interval <- interval(months_analysis, months_analysis + months(1) - days(1))
 
-  n_vacancy <- data.frame(date = months_interval, vacancy = 0)
+  n_vacancy <- data.frame(date = months_interval, type = 0, vacancy = 0)
+  n_vacancy <- rbind(n_vacancy, n_vacancy)
 
   for (i in 1:length(months_interval)) {
-     n_vacancy[i, 2] <- 
+     n_vacancy[i, 2:3] <- c('theoretical',
        sum(CBOP_year$poz_lWolnychMiejsc[which(int_overlaps(
          interval(CBOP_year$poz_dataUdostepnieniaOferty, CBOP_year$poz_ofertaWaznaDo),
-         months_interval[i]))])
+         months_interval[i]))]))
+     n_vacancy[i+length(months_interval), 2:3] <- c('predicted',
+       sum(CBOP_year$predict_vacancy[which(int_overlaps(
+         interval(CBOP_year$poz_dataUdostepnieniaOferty, CBOP_year$poz_ofertaWaznaDo),
+         months_interval[i]))]))
   }
   
   n_vacancy[,1] <- format(months_analysis, format = "%Y/%m")
-  n_vacancy[,2] <- n_vacancy[,2]/1000
+  n_vacancy[,3] <- as.numeric(n_vacancy[,3])/1000
   
-  n_plot <- ggplot(data = n_vacancy, aes(x = date, y = vacancy)) +
-    geom_bar(stat = "identity") +
+  n_plot <- ggplot(data = n_vacancy, aes(x = date, y = vacancy, group = type)) +
+    geom_line(aes(color = type)) +
+    geom_point(aes(color = type)) +
     theme_bw() +
+    scale_color_manual(values=c('grey50','black')) +
     theme(plot.title = element_blank(), axis.title.x = element_blank(), 
           axis.title.y = element_blank(),
-          axis.ticks.x = element_blank())
-  
+          axis.ticks.x = element_blank(),
+          legend.position = 'bottom',
+          legend.title = element_blank())
+    
   return(n_plot)
 }
 ```
@@ -122,41 +137,55 @@ print(n_vacancy_plot_all)
 ```{r}
 #Demand for specific job groups - function
 n_occup_group_plot <- function(CBOP_year, startDate, endDate) {
-  months_analysis <- seq(ym(startDate), ym(endDate), by = "month")   
+  months_analysis <- seq(ym(startDate), ym(endDate), by = 'month')   
   months_interval <- interval(months_analysis, months_analysis + months(1) - days(1))
   
-  occupation_code <-  data.frame(months = months_interval, group1 = 0,
+  occupation_code <-  data.frame(months = months_interval, type = 0, group1 = 0,
                                  group2 = 0, group3 = 0, group4 = 0, group5 = 0,
                                  group6 = 0, group7 = 0, group8 = 0, group9 = 0)
   
-  colnames(occupation_code) <- c('months', '1 - Public officials', '2 - Professionals', 
-                                 '3 - Technicians', '4 - Office workers', 
-                                 '5 - Service workers', '6 - Farmers', 
-                                 '7 - Craft workers', '8 - Machine operators', 
-                                 '9 - Simple work employees')
+  colnames(occupation_code) <- c('months', 'type', '1 - Public officials', 
+                                 '2 - Professionals', '3 - Technicians', 
+                                 '4 - Office workers', '5 - Service workers', 
+                                 '6 - Farmers', '7 - Craft workers', 
+                                 '8 - Machine operators', '9 - Simple work employees')
+  
+  occupation_code <- rbind(occupation_code, occupation_code)
   
   for (i in 1:length(months_interval)) {
     for (k in 1:9) {
-      occupation_code[i, k+1] <- 
+      occupation_code[i, k+2] <- 
         sum(CBOP_year$poz_lWolnychMiejsc[which(int_overlaps(
-          interval(CBOP_year$poz_dataUdostepnieniaOferty, CBOP_year$poz_ofertaWaznaDo),           
+          interval(CBOP_year$poz_dataUdostepnieniaOferty, CBOP_year$poz_ofertaWaznaDo), 
           months_interval[i]) & CBOP_year$poz_grupaZawodu == as.character(k))]) 
+      occupation_code[i, 2] <- 'theoretical'
+      occupation_code[i+length(months_interval), k+2] <- 
+        sum(CBOP_year$predict_vacancy[which(int_overlaps(
+          interval(CBOP_year$poz_dataUdostepnieniaOferty, CBOP_year$poz_ofertaWaznaDo), 
+          months_interval[i]) & CBOP_year$poz_grupaZawodu == as.character(k))]) 
+      occupation_code[i+length(months_interval), 2] <- 'predicted'
     }
   }
   
   occupation_code[,1] <- format(months_analysis, format = "%Y/%m")
-  occupation_code[,-(1)] <- occupation_code[,-(1)]/1000
+  occupation_code[,3:11] <- occupation_code[,3:11]/1000
   
-  occupation_code <- melt(occupation_code, id.vars = "months")
+  occupation_code <- melt(occupation_code, id.vars = c("months", "type"))
 
-  demand_occup_plot <- ggplot(data = occupation_code, aes(x = months, y = value)) +
-    geom_bar(stat='identity') +
-    facet_wrap(~variable) +
+  demand_occup_plot <- ggplot(data = occupation_code, 
+                              aes(x = months, y = value, group = type)) +
+    geom_line(aes(color = type)) +
+    geom_point(aes(color = type)) +
     theme_bw() +
-    theme(plot.title = element_blank(), axis.title.x = element_blank(), 
-      axis.title.y = element_blank(),
-      axis.text.x = element_text(angle = 50, vjust = 1, hjust = 1),
-      axis.ticks.x = element_blank())
+    scale_color_manual(values=c('grey50','black')) +
+    theme(plot.title = element_blank(), 
+          axis.title.x = element_blank(), 
+          axis.title.y = element_blank(),
+          axis.text.x = element_text(angle = 50, vjust = 1, hjust = 1),
+          axis.ticks.x = element_blank(),
+          legend.position = 'bottom',
+          legend.title = element_blank()) +
+    facet_wrap(~variable)
   
  return(demand_occup_plot) 
 }
@@ -171,10 +200,10 @@ print(demand_og_plot_all)
 ```{r}
 #Number of vacancies by province - function
 n_province <- function(CBOP_year, startDate, endDate) {
-  months_analysis <- seq(ym(startDate), ym(endDate), by = "month")   
+  months_analysis <- seq(ym(startDate), ym(endDate), by = 'month')   
   months_interval <- interval(months_analysis, months_analysis + months(1) - days(1))
   
-  occupancies_provinces <- data.frame(months = months_interval, 
+  occupancies_provinces <- data.frame(months = months_interval, type = 0,
                                       dolnoslaskie = 0, kujawsko_pomorskie = 0,
                                       lubelskie = 0, lubuskie = 0, lodzkie = 0,
                                       malopolskie  = 0, mazowieckie = 0, 
@@ -183,34 +212,49 @@ n_province <- function(CBOP_year, startDate, endDate) {
                                       swietokorzyskie = 0, warminisko_mazurskie = 0,
                                       wielkopolskie = 0, zachodniopomorskie = 0)
   
+  occupancies_provinces <- rbind(occupancies_provinces, occupancies_provinces)
+  
   for (i in 1:length(months_interval)) {
     for (k in 1:16) {
-      occupancies_provinces[i, k + 1] <-
+      occupancies_provinces[i, k + 2] <-
         sum(CBOP_year$poz_lWolnychMiejsc[which(int_overlaps( 
-          interval(CBOP_year$poz_dataUdostepnieniaOferty, CBOP_year$poz_ofertaWaznaDo),          
+          interval(CBOP_year$poz_dataUdostepnieniaOferty, CBOP_year$poz_ofertaWaznaDo), 
           months_interval[i]) & CBOP_year$war_kodWojewodztwa == as.character(k*2))])
+      occupancies_provinces[i, 2] <- 'theoretical'
+      occupancies_provinces[i+length(months_interval), k + 2] <-
+        sum(CBOP_year$predict_vacancy[which(int_overlaps( 
+          interval(CBOP_year$poz_dataUdostepnieniaOferty, CBOP_year$poz_ofertaWaznaDo), 
+          months_interval[i]) & CBOP_year$war_kodWojewodztwa == as.character(k*2))])
+      occupancies_provinces[i+length(months_interval), 2] <- 'predicted'
     }
   }
   
   occupancies_provinces[,1] <- format(months_analysis, format = "%Y/%m")
-  occupancies_provinces[,-(1)] <- occupancies_provinces[,-(1)]/1000
-  colnames(occupancies_provinces) <- c('months', 'dolnośląskie', 'kujawsko pomorskie',
+  occupancies_provinces[,3:18] <- occupancies_provinces[,3:18]/1000
+  colnames(occupancies_provinces) <- c('months', 'type', 'dolnośląskie', 
+                                       'kujawsko pomorskie',
                                         'lubelskie', 'lubuskie', 'łódzkie',
                                         'małopolskie', 'mazowieckie', 'opolskie',
                                         'podkarpackie', 'podlaskie', 'pomorskie',
                                         'śląskie', 'świętokrzyskie', 
                                         'warmińsko mazurskie', 'wielkopolskie',
                                         'zachodniopomorskie')
-  occupancies_provinces <- melt(occupancies_provinces, id.vars = "months")
+  occupancies_provinces <- melt(occupancies_provinces, id.vars = c("months", "type"))
 
-  province_plot <- ggplot(data = occupancies_provinces, aes(x = months, y = value)) +
-    geom_bar(stat='identity') +
+  province_plot <- ggplot(data = occupancies_provinces, 
+                          aes(x = months, y = value, group = type)) +
+    geom_line(aes(color = type)) +
+    geom_point(aes(color = type)) +
     theme_bw() +
+    scale_color_manual(values=c('grey50','black')) +
     facet_wrap(~variable) +
-    theme(plot.title = element_blank(), axis.title.x = element_blank(), 
-      axis.title.y = element_blank(),
-      axis.text.x = element_text(angle = 50, vjust = 1, hjust = 1),
-      axis.ticks.x = element_blank())
+    theme(plot.title = element_blank(), 
+          axis.title.x = element_blank(), 
+          axis.title.y = element_blank(),
+          axis.text.x = element_text(angle = 50, vjust = 1, hjust = 1),
+          axis.ticks.x = element_blank(),
+          legend.position = 'bottom',
+          legend.title = element_blank())
   
   return(province_plot)
 }
@@ -225,7 +269,7 @@ print(province_plot_all)
 ```{r}
 #Number of vacancies offered for employees by contract type - function
 # n_contract_plot <- function(CBOP_year, startDate, endDate, contracts) {
-#   months_analysis <- seq(ym(startDate), ym(endDate), by = "month")   
+#   months_analysis <- seq(ym(startDate), ym(endDate), by = 'month')   
 #   months_interval <- interval(months_analysis, months_analysis + months(1) - days(1))
 #   
 #   contract_type_years <- data.frame(months = months_interval, vacancy = 0)
@@ -254,36 +298,48 @@ print(province_plot_all)
 ```{r}
 #Number of vacancies offered for employees by every contracts type - function
 n_every_contracts_plot <- function(CBOP_year, startDate, endDate, contracts) {
-  months_analysis <- seq(ym(startDate), ym(endDate), by = "month")   
+  months_analysis <- seq(ym(startDate), ym(endDate), by = 'month')   
   months_interval <- interval(months_analysis, months_analysis + months(1) - days(1))
 
-  contract_type_years <- data.frame(months = months_interval, u1 = 0, u2 = 0, u3 = 0,
-                                    u4 = 0, u5 = 0)
+  contract_type_years <- data.frame(months = months_interval, type = 0, u1 = 0, u2 = 0,
+                                    u3 = 0, u4 = 0, u5 = 0)
 
-  colnames(contract_type_years) <- append(c('months'), contracts[,1])
+  colnames(contract_type_years) <- append(c('months', 'type'), contracts[,1])
+  contract_type_years <- rbind(contract_type_years, contract_type_years)
 
   for (k in 1:5) {
     for (i in 1:length(months_interval)) {
      contract_type_years[i, k+1] <-
        sum(CBOP_year$poz_lWolnychMiejsc[which(int_overlaps(   
-         interval(CBOP_year$poz_dataUdostepnieniaOferty, CBOP_year$poz_ofertaWaznaDo),          
+         interval(CBOP_year$poz_dataUdostepnieniaOferty, CBOP_year$poz_ofertaWaznaDo), 
          months_interval[i]) & CBOP_year$war_kodRodzajuZatrudnienia == contracts[k, 2])])
+     contract_type_years[i, 2] <- 'theoretical'
+     contract_type_years[i+length(months_interval), k+1] <-
+       sum(CBOP_year$predict_vacancy[which(int_overlaps(   
+         interval(CBOP_year$poz_dataUdostepnieniaOferty, CBOP_year$poz_ofertaWaznaDo), 
+         months_interval[i]) & CBOP_year$war_kodRodzajuZatrudnienia == contracts[k, 2])])
+     contract_type_years[i+length(months_interval), 2] <- 'predicted'
     }
   }
   
   contract_type_years[,1] <- format(months_analysis, format = "%Y/%m")
-  contract_type_years[,-(1)] <- contract_type_years[,-(1)]/1000
-  contract_type_years <- melt(contract_type_years, id.vars="months")
+  contract_type_years[,3:7] <- contract_type_years[,3:7]/1000
+  contract_type_years <- melt(contract_type_years, id.vars = c('months', 'type'))
 
   every_contracts_plot <- ggplot(data = contract_type_years, 
-                               aes(x = months, y = value)) +
-    geom_bar(stat='identity') +
+                               aes(x = months, y = value, group = type)) +
+    geom_line(aes(color = type)) +
+    geom_point(aes(color = type)) +
     theme_bw() + 
-    facet_wrap(~variable) +
-    theme(plot.title = element_blank(), axis.title.x = element_blank(), 
-      axis.title.y = element_blank(),
-      axis.text.x = element_text(angle = 50, vjust = 1, hjust = 1),
-      axis.ticks.x = element_blank())
+    facet_wrap(~variable, nrow = 3) +
+    scale_color_manual(values=c('grey50','black')) +
+    theme(plot.title = element_blank(), 
+          axis.title.x = element_blank(), 
+          axis.title.y = element_blank(),
+          axis.text.x = element_text(angle = 50, vjust = 1, hjust = 1),
+          axis.ticks.x = element_blank(),
+          legend.position = 'bottom',
+          legend.title = element_blank())
   
   return(every_contracts_plot)
 }
@@ -295,13 +351,13 @@ contracts <- data.frame(
   contract_type = c('Employment contract for a definite period', 'Employment contract for a trial period', 'Employment contract for an indefinite period', 'Contract for the time of performance of specific work', 'Substitute employment contract'), 
   contract_code = c("RPs005|12", "RPs005|13", "RPs005|11", "RPs005|18", "RPs005|22"))
 
-contract_plot <- list()
-for (k in 1:5) {
-  contract_plot[[k]] <- n_contract_plot(CBOP_all, "2020/10", "2022/01",
-                                          contracts[k,])
-  print(contract_plot[k])
-}
-rm(k)
+# contract_plot <- list()
+# for (k in 1:5) {
+#   contract_plot[[k]] <- n_contract_plot(CBOP_all, "2020/10", "2022/01",
+#                                           contracts[k,])
+#   print(contract_plot[k])
+# }
+# rm(k)
 
 every_contracts_plot_all <- n_every_contracts_plot(CBOP_all, "2020/10",
                                                    "2022/01", contracts)
