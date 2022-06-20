@@ -149,6 +149,7 @@ CBOP_demand_vacancy <- merge(x=CBOP_demand_vacancy_website,
                              by="vacancies", all=TRUE)
 
 CBOP_demand_vacancy <- CBOP_demand_vacancy %>% mutate_all(~replace(., is.na(.), 0))
+CBOP_demand_vacancy$proportion <- round(CBOP_demand_vacancy$number_of_offers_current/CBOP_demand_vacancy$number_of_offers_website, 2)
 ```
 
 ```{r}
@@ -167,7 +168,7 @@ CBOP_phones <- CBOP_phones %>%
                                         czas_dostepnosci < 50 ~ "<25; 50)",
                                         czas_dostepnosci < 75 ~ "<50; 75)",
                                         czas_dostepnosci < 100 ~ "<75; 100)",
-                                        TRUE ~ ">100"))
+                                        TRUE ~ ">=100"))
 
 ```
 
@@ -196,6 +197,12 @@ model <- glm(formula = valid_bolean ~ poz_grupaZawodu + czas_dostepnosci_przedzi
 summary(model)
 
 car::Anova(model)
+```
+```{r}
+#Count R2 McFadden
+model_null <- glm(formula = valid_bolean ~ 1, data = CBOP_phones, family = binomial())
+
+1-logLik(model)/logLik(model_null)
 ```
 
 ```{r}
